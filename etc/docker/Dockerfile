@@ -34,7 +34,8 @@ RUN composer install --no-dev --no-interaction --no-scripts --no-autoloader --pr
 
 COPY . .
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative \
-    && php artisan package:discover --ansi
+    && php artisan package:discover --ansi \
+    && cp vendor/laravel/octane/src/Commands/stubs/frankenphp-worker.php public/frankenphp-worker.php
 
 # Front-end assets. The Wayfinder Vite plugin runs `php artisan`, so the
 # build runs on the PHP stage with Node added.
@@ -64,7 +65,7 @@ COPY --from=assets /app/public/build /app/public/build
 
 RUN rm -rf tests node_modules \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && chown -R www-data:www-data storage bootstrap/cache /data/caddy /config/caddy
 
 USER www-data
 

@@ -1,11 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "kytel0925/laravel-one-shot",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Laravel 13 + Inertia + Vue + Vuetify template with a Docker Compose environment.",
     "keywords": [
         "laravel",
-        "framework"
+        "inertia",
+        "vue",
+        "vuetify",
+        "octane",
+        "docker"
     ],
     "license": "MIT",
     "require": {
@@ -45,16 +49,13 @@
     },
     "scripts": {
         "setup": [
-            "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install",
-            "npm run build"
+            "docker compose up -d --wait"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+            "docker compose up -d --wait",
+            "docker compose logs -f app"
         ],
         "lint": [
             "pint --parallel"
@@ -88,9 +89,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
@@ -98,11 +97,7 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": [],
-            "installer": {
-                "post-create-project": [
-                ]
-            }
+            "dont-discover": []
         }
     },
     "config": {
@@ -112,8 +107,6 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
-        },
-        "platform": {
         }
     },
     "minimum-stability": "stable",
