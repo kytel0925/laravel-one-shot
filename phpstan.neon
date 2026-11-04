@@ -9,5 +9,10 @@ parameters:
         - config/
         - database/
         - routes/
+        - src/
 
     level: 7
+
+    ignoreErrors:
+        # Shared model traits (app/Models/Traits) wait for the first aggregate that uses them.
+        - identifier: trait.unused

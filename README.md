@@ -28,23 +28,24 @@ Each published port can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, …
 
 ## Everyday commands
 
-Run them inside the `app` container:
+Run them inside the `app` container (`docker compose exec app …`):
 
-```bash
-docker compose exec app php artisan test --compact
-```
+| Task                                   | Command                                          |
+| -------------------------------------- | ------------------------------------------------ |
+| All PHP tests (Unit, Feature, Browser) | `php artisan test --compact`                     |
+| Browser (E2E) tests only               | `php artisan test --compact --testsuite=Browser` |
+| Frontend unit tests                    | `npm run test`                                   |
+| Everything CI runs                     | `composer ci:check`                              |
+| Production build of the assets         | `npm run build`                                  |
 
-```bash
-docker compose exec app composer ci:check
-```
+Tests use the Compose services, never SQLite or array drivers: the `testing`
+PostgreSQL database (so tests never reset your development data), Redis,
+RabbitMQ and Mailpit. Browser tests drive Playwright's Chromium through Pest's
+browser plugin inside the same container. CI (`.github/workflows/tests.yml`)
+starts the same stack and runs `composer ci:check`.
 
-```bash
-docker compose exec app npm run build
-```
-
-Tests use the Compose services, not SQLite or array drivers: the `testing`
-PostgreSQL database (created by `etc/docker/postgres/`), Redis, RabbitMQ and
-Mailpit. Browser tests (Pest + Playwright Chromium) run in the same container.
+On Linux, set `APP_UID` and `APP_GID` in `.env` to your `id -u` / `id -g` if
+they are not 1000, so files the container writes stay yours.
 
 ## Project documentation
 

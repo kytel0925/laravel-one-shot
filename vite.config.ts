@@ -56,6 +56,11 @@ export default defineConfig({
             ],
         },
     },
+    test: {
+        // Pure TypeScript helpers only; pages and components are covered by
+        // the Pest browser tests. Keeps vendor/ specs out of the run.
+        include: ['resources/js/**/*.test.ts'],
+    },
     lint: {
         ignorePatterns: [
             'vendor/**',

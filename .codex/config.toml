@@ -1,0 +1,10 @@
+# MCP servers for Codex; mirrors .mcp.json (Claude Code). Laravel Boost runs
+# inside the `app` container of docker-compose.yml.
+
+[mcp_servers.laravel-boost]
+command = "docker"
+args = ["compose", "exec", "-T", "app", "php", "artisan", "boost:mcp"]
+
+[mcp_servers.vuetify]
+command = "npx"
+args = ["-y", "@vuetify/mcp"]

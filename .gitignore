@@ -29,18 +29,12 @@ yarn-error.log
 /.zed
 /.agents
 /.amp
-/.claude
-/.codex
 /.cursor
 /.factory
 /.grok
 /.junie
 /.kiro
 /.pi
-/.mcp.json
-/AGENTS.md
-/CLAUDE.md
-/boost.json
 /opencode.json
 /opencode.jsonc
 
@@ -48,3 +42,8 @@ yarn-error.log
 /frankenphp
 /public/frankenphp-worker.php
 /tests/Browser/Screenshots
+
+# Agent instructions (AGENTS.md, CLAUDE.md, .claude/commands, .codex, .mcp.json,
+# boost.json) are committed; only local agent state is ignored.
+/.claude/settings.local.json
+/.claude/skills
