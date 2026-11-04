@@ -1,0 +1,39 @@
+# Development image: PHP 8.5 on FrankenPHP (Octane), Composer, Node 24 and
+# Playwright's Chromium for Pest browser tests. The source is bind-mounted at
+# /app by docker-compose.yml; etc/bin/dev.sh installs dependencies and starts
+# the servers.
+FROM dunglas/frankenphp:1-php8.5-bookworm
+
+ARG NODE_VERSION=24
+# Must match the "playwright" version in package-lock.json.
+ARG PLAYWRIGHT_VERSION=1.64.1
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/tmp/composer \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PATH="/app/vendor/bin:/app/node_modules/.bin:${PATH}"
+
+RUN install-php-extensions \
+        bcmath \
+        intl \
+        opcache \
+        pcntl \
+        pdo_pgsql \
+        pgsql \
+        redis \
+        sockets \
+        zip \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git gnupg postgresql-client unzip \
+    && curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/* /root/.npm
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+EXPOSE 8000 5173
+
+CMD ["etc/bin/dev.sh"]

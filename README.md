@@ -1,27 +1,58 @@
-# Laravel + Vue Starter Kit
+# Laravel One-Shot
 
-## Introduction
+A production-ready template built on the Laravel 13 Inertia + Vue starter kit
+(no teams). It runs Vue 3, TypeScript and Inertia 3 with Vuetify (Material
+Design), served by Octane on FrankenPHP (PHP 8.5). PostgreSQL, Redis,
+RabbitMQ and Mailpit run in Docker Compose.
 
-Our Vue starter kit provides a robust, modern starting point for building Laravel applications with a Vue frontend using [Inertia](https://inertiajs.com).
+## Quick start
 
-Inertia allows you to build modern, single-page Vue applications using classic server-side routing and controllers. This lets you enjoy the frontend power of Vue combined with the incredible backend productivity of Laravel and lightning-fast Vite compilation.
+```bash
+cp .env.example .env && docker compose up -d
+```
 
-This Vue starter kit utilizes Vue 3 and the Composition API, TypeScript, Tailwind, and the [shadcn-vue](https://www.shadcn-vue.com) component library.
+The first start installs Composer and npm dependencies, generates `APP_KEY`,
+runs the migrations, and then starts Octane, the Vite dev server and a queue
+worker. Watch the progress with `docker compose logs -f app`.
 
-## Official Documentation
+| Service           | URL / port                                     |
+| ----------------- | ---------------------------------------------- |
+| Application       | http://localhost:8000                          |
+| Vite dev server   | http://localhost:5173                          |
+| Mailpit (web UI)  | http://localhost:8025                          |
+| RabbitMQ (web UI) | http://localhost:15672 (`guest` / `guest`)     |
+| PostgreSQL        | `localhost:5432` (`laravel` / `secret`)        |
+| Redis             | `localhost:6379`                               |
 
-Documentation for all Laravel starter kits can be found on the [Laravel website](https://laravel.com/docs/starter-kits).
+Each published port can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, …).
 
-## Contributing
+## Everyday commands
 
-Thank you for considering contributing to our starter kit! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Run them inside the `app` container:
 
-All contributions to the Starter Kits from now on should be made through [Maestro](https://github.com/laravel/maestro).
+```bash
+docker compose exec app php artisan test --compact
+```
 
-## Code of Conduct
+```bash
+docker compose exec app composer ci:check
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+docker compose exec app npm run build
+```
+
+Tests use the Compose services, not SQLite or array drivers: the `testing`
+PostgreSQL database (created by `etc/docker/postgres/`), Redis, RabbitMQ and
+Mailpit. Browser tests (Pest + Playwright Chromium) run in the same container.
+
+## Project documentation
+
+- [AGENTS.md](AGENTS.md): instructions for coding agents, and the index of the
+  project rules in `resources/docs/agents/`.
+- [resources/docs/](resources/docs/): ADRs, OpenAPI and AsyncAPI specs,
+  `DEPLOYMENT.md` and `ER.md`.
 
 ## License
 
-The Laravel + Vue starter kit is open-sourced software licensed under the MIT license.
+MIT.

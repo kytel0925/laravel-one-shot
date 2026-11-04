@@ -32,6 +32,11 @@ export default defineConfig({
         }),
     ]),
     server: {
+        // In Docker the dev server listens on 0.0.0.0; browsers must load it
+        // through the published host name instead (docker-compose.yml).
+        hmr: process.env.VITE_HMR_HOST
+            ? { host: process.env.VITE_HMR_HOST }
+            : undefined,
         watch: {
             ignored: [
                 '**/.agents/**',
