@@ -1,0 +1,565 @@
+openapi: 3.1.0
+info:
+    title: Base settings
+    version: 1.0.0
+    description: >-
+        Account settings routes from routes/settings.php (profile, security, password, appearance) and the
+        `.well-known/passkey-endpoints` document. Pages are Inertia components rendered by
+        App\Http\Controllers\Settings\ProfileController and SecurityController. Everything acts on the
+        logged-in user; no user id appears in any path.
+
+        Shared Inertia props (`HandleInertiaRequests::share()`: name, auth.user, sidebarOpen, appearance,
+        systemTheme, viewport, plus errors and flash) are on every page. Successful updates flash
+        `toast` = {type: success, message} to the shared `flash` prop. Inertia turns 302 into 303 for
+        PUT, PATCH and DELETE.
+servers:
+    - url: http://localhost:8000
+security:
+    - session: []
+      csrf: []
+tags:
+    - name: profile
+    - name: security
+    - name: appearance
+    - name: discovery
+paths:
+    /settings:
+        get:
+            operationId: redirectSettings
+            summary: Redirect to the profile settings
+            description: >-
+                `Route::redirect('settings', '/settings/profile')`. Laravel registers it for every HTTP method
+                (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS); behavior is identical.
+            tags: [profile]
+            x-route-name: null
+            x-middleware: [auth]
+            responses:
+                '302':
+                    description: Redirect to `/settings/profile` (guests are redirected to `/login` by `auth`).
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+    /settings/profile:
+        get:
+            operationId: showProfileSettings
+            summary: Profile settings page
+            tags: [profile]
+            x-route-name: profile.edit
+            x-middleware: [auth]
+            x-inertia-component: settings/Profile
+            x-inertia-props:
+                page: [mustVerifyEmail, status]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                        flash,
+                    ]
+            responses:
+                '200':
+                    description: >-
+                        Inertia page `settings/Profile`. `mustVerifyEmail` is true when the User model implements
+                        MustVerifyEmail (always, here); `status` is the flashed session status
+                        (`verification-link-sent` after a resend). The form is prefilled from `auth.user`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+        patch:
+            operationId: updateProfile
+            summary: Update name and email
+            description: >-
+                ProfileUpdateRequest uses ProfileValidationRules. Changing the email clears `email_verified_at`.
+                Flashes the toast "Profile updated.".
+            tags: [profile]
+            x-route-name: profile.update
+            x-middleware: [auth]
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ProfileUpdateRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ProfileUpdateRequest'
+            responses:
+                '302':
+                    description: Redirect to `/settings/profile`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+        delete:
+            operationId: deleteAccount
+            summary: Delete the account
+            description: >-
+                ProfileDeleteRequest requires the current password. Logs out, deletes the user (passkeys are removed by
+                the `passkeys.user_id` cascade), invalidates the session and regenerates the CSRF token.
+            tags: [profile]
+            x-route-name: profile.destroy
+            x-middleware: [auth, verified]
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ProfileDeleteRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ProfileDeleteRequest'
+            responses:
+                '302':
+                    description: Redirect to `/`. Unverified users are redirected to `/email/verify` by `verified`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: JSON request by a user whose email is not verified.
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+    /settings/security:
+        get:
+            operationId: showSecuritySettings
+            summary: Security settings page
+            description: >-
+                Password change, two-factor management and passkey management. Requires a recent password
+                confirmation (`Illuminate\Auth\Middleware\RequirePassword`, default 900 seconds): HTML and Inertia
+                requests are redirected to `/user/confirm-password`, JSON requests get 423.
+            tags: [security]
+            x-route-name: security.edit
+            x-middleware:
+                [auth, verified, 'Illuminate\Auth\Middleware\RequirePassword']
+            x-inertia-component: settings/Security
+            x-inertia-props:
+                page:
+                    [
+                        canManageTwoFactor,
+                        canManagePasskeys,
+                        passkeys,
+                        passwordRules,
+                        twoFactorEnabled,
+                        requiresConfirmation,
+                    ]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                        flash,
+                    ]
+            responses:
+                '200':
+                    description: Inertia page `settings/Security`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                allOf:
+                                    - $ref: '#/components/schemas/InertiaPage'
+                                    - type: object
+                                      properties:
+                                          props:
+                                              $ref: '#/components/schemas/SecurityPageProps'
+                '302':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: JSON request by a user whose email is not verified.
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /settings/password:
+        put:
+            operationId: updatePassword
+            summary: Change the password
+            description: >-
+                PasswordUpdateRequest: `current_password` must match, `password` follows `Password::defaults()` and
+                must be confirmed. Flashes the toast "Password updated." and goes back.
+            tags: [security]
+            x-route-name: user-password.update
+            x-middleware: [auth, verified, 'throttle:6,1']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/PasswordUpdateRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PasswordUpdateRequest'
+            responses:
+                '302':
+                    description: Redirect back to the previous page.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: JSON request by a user whose email is not verified.
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /settings/appearance:
+        get:
+            operationId: showAppearanceSettings
+            summary: Appearance settings page
+            description: >-
+                `Route::inertia('settings/appearance', 'settings/Appearance')`. The choice is stored client-side in
+                the `appearance` cookie (read back as the shared `appearance` prop); no server endpoint saves it.
+            tags: [appearance]
+            x-route-name: appearance.edit
+            x-middleware: [auth, verified]
+            x-inertia-component: settings/Appearance
+            x-inertia-props:
+                page: []
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                        flash,
+                    ]
+            responses:
+                '200':
+                    description: Inertia page `settings/Appearance`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: JSON request by a user whose email is not verified.
+    /.well-known/passkey-endpoints:
+        get:
+            operationId: getPasskeyEndpoints
+            summary: Passkey endpoints discovery document
+            description: >-
+                Lets credential managers find where to enroll and manage passkeys. Public, no authentication,
+                middleware `web` only.
+            tags: [discovery]
+            security: []
+            x-route-name: well-known.passkeys
+            x-middleware: []
+            responses:
+                '200':
+                    description: Absolute URLs of `/settings/security`.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [enroll, manage]
+                                properties:
+                                    enroll:
+                                        type: string
+                                        format: uri
+                                    manage:
+                                        type: string
+                                        format: uri
+components:
+    securitySchemes:
+        session:
+            type: apiKey
+            in: cookie
+            name: laravel-session
+            description: >-
+                Laravel session cookie (SESSION_COOKIE, default `<app-name>-session`; the session is stored in Redis).
+                Users are identified only by this session; no user id appears in any route path
+                (the one framework deviation is documented on `verifyEmail` in base-auth).
+        csrf:
+            type: apiKey
+            in: header
+            name: X-XSRF-TOKEN
+            description: >-
+                CSRF token. Laravel sets the `XSRF-TOKEN` cookie; send its decoded value in the
+                `X-XSRF-TOKEN` header on every non-GET request. A missing or wrong token yields 419.
+    headers:
+        Location:
+            description: Target of the redirect.
+            schema:
+                type: string
+    schemas:
+        ProfileUpdateRequest:
+            type: object
+            description: ProfileValidationRules::profileRules(user id); `user_id` is taken from the session, never from the body.
+            required: [name, email]
+            properties:
+                name:
+                    type: string
+                    maxLength: 255
+                email:
+                    type: string
+                    format: email
+                    maxLength: 255
+                    description: Unique in `users.email`, ignoring the current user.
+        ProfileDeleteRequest:
+            type: object
+            required: [password]
+            properties:
+                password:
+                    type: string
+                    description: Must match the current password (rule `current_password`).
+        PasswordUpdateRequest:
+            type: object
+            description: >-
+                `Password::defaults()` is minimum 8 characters outside production; in production minimum 12, mixed
+                case, letters, numbers, symbols and not compromised.
+            required: [current_password, password, password_confirmation]
+            properties:
+                current_password:
+                    type: string
+                password:
+                    type: string
+                    minLength: 8
+                password_confirmation:
+                    type: string
+                    description: Must equal `password` (rule `confirmed`).
+        PasskeySummary:
+            type: object
+            required:
+                [id, name, authenticator, created_at_diff, last_used_at_diff]
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                authenticator:
+                    type: [string, 'null']
+                created_at_diff:
+                    type: string
+                    description: Human-readable age, e.g. `2 days ago`.
+                last_used_at_diff:
+                    type: [string, 'null']
+        SecurityPageProps:
+            type: object
+            description: Page props of `settings/Security` (shared props are described on InertiaSharedProps).
+            required:
+                [canManageTwoFactor, canManagePasskeys, passkeys, passwordRules]
+            properties:
+                canManageTwoFactor:
+                    type: boolean
+                canManagePasskeys:
+                    type: boolean
+                passkeys:
+                    type: array
+                    description: Newest first; empty when passkeys cannot be managed.
+                    items:
+                        $ref: '#/components/schemas/PasskeySummary'
+                passwordRules:
+                    type: string
+                twoFactorEnabled:
+                    type: boolean
+                    description: Only present when `canManageTwoFactor` is true.
+                requiresConfirmation:
+                    type: boolean
+                    description: Only present when `canManageTwoFactor` is true; mirrors the Fortify `confirm` option.
+        InertiaPage:
+            type: object
+            description: Inertia page object returned for Inertia XHR requests.
+            required: [component, props, url, version]
+            properties:
+                component:
+                    type: string
+                props:
+                    $ref: '#/components/schemas/InertiaSharedProps'
+                url:
+                    type: string
+                version:
+                    type: [string, 'null']
+        ValidationError:
+            type: object
+            description: Laravel validation failure (JSON requests, status 422).
+            required: [message, errors]
+            properties:
+                message:
+                    type: string
+                    example: The given data was invalid.
+                errors:
+                    type: object
+                    additionalProperties:
+                        type: array
+                        items:
+                            type: string
+        MessageResponse:
+            type: object
+            required: [message]
+            properties:
+                message:
+                    type: string
+        InertiaSharedProps:
+            type: object
+            description: >-
+                Props shared with every Inertia page by `HandleInertiaRequests::share()`
+                (plus Inertia's own `errors` and `flash`).
+            required:
+                [name, auth, sidebarOpen, appearance, systemTheme, viewport]
+            properties:
+                name:
+                    type: string
+                    description: config('app.name').
+                auth:
+                    type: object
+                    required: [user]
+                    properties:
+                        user:
+                            oneOf:
+                                - $ref: '#/components/schemas/User'
+                                - type: 'null'
+                sidebarOpen:
+                    type: boolean
+                    description: False only when the `sidebar_state` cookie is present and not `true`.
+                appearance:
+                    type: string
+                    enum: [light, dark, system]
+                    description: From the `appearance` cookie; `system` when absent or invalid.
+                systemTheme:
+                    type: string
+                    enum: [light, dark]
+                    description: From the `system_theme` cookie; `light` unless it is `dark`.
+                viewport:
+                    type: object
+                    required: [width, height]
+                    properties:
+                        width:
+                            type: integer
+                        height:
+                            type: integer
+                    description: >-
+                        Parsed from the `viewport` cookie (`<width>x<height>`, 2 to 5 digits each);
+                        defaults to 1280x800.
+                errors:
+                    type: object
+                    description: Validation errors of the previous request, keyed by field.
+                    additionalProperties:
+                        type: string
+                flash:
+                    type: object
+                    description: >-
+                        One-time data. Settings controllers flash `toast` = {type, message}.
+                    additionalProperties: true
+        User:
+            type: object
+            description: >-
+                The authenticated user as serialized by the User model. Hidden attributes
+                (`password`, `two_factor_secret`, `two_factor_recovery_codes`, `remember_token`) are never sent.
+            required: [id, name, email]
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                email_verified_at:
+                    type: [string, 'null']
+                    format: date-time
+                two_factor_confirmed_at:
+                    type: [string, 'null']
+                    format: date-time
+                created_at:
+                    type: [string, 'null']
+                    format: date-time
+                updated_at:
+                    type: [string, 'null']
+                    format: date-time
+    responses:
+        Unauthenticated:
+            description: >-
+                Not logged in. HTML and Inertia requests get a 302 redirect to `/login`;
+                JSON requests (`Accept: application/json`) get 401.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Unauthenticated.
+        AlreadyAuthenticated:
+            description: Logged-in users are redirected to `/dashboard` by the `guest` middleware.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        EmailNotVerified:
+            description: >-
+                The `verified` middleware redirects unverified users to `/email/verify`
+                (JSON requests get 403 `Your email address is not verified.`).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        PasswordConfirmationRequired:
+            description: >-
+                The `password.confirm` middleware (RequirePassword). HTML and Inertia requests are redirected
+                to `/user/confirm-password`; JSON requests get 423. The confirmation lasts
+                `auth.password_timeout` seconds (900 by default).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Password confirmation required.
+        CsrfMismatch:
+            description: Missing or invalid CSRF token (page expired).
+        ValidationFailed:
+            description: >-
+                Validation failed. JSON requests get 422 with this body. HTML and Inertia
+                requests get a redirect back to the previous page with the errors flashed to the
+                session (exposed as the shared `errors` prop).
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/ValidationError'
+        TooManyRequests:
+            description: Rate limit exceeded; the response carries `Retry-After`.
+            headers:
+                Retry-After:
+                    schema:
+                        type: integer

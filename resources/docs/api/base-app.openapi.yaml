@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+    title: Base app
+    version: 1.0.0
+    description: >-
+        Public home page, the authenticated dashboard and the health check
+        (routes/web.php and the `health` option of bootstrap/app.php).
+        Pages are Inertia components: a browser visit returns the HTML shell, an
+        Inertia XHR (`X-Inertia: true`) returns the page object JSON.
+        Shared props from `HandleInertiaRequests::share()` (name, auth.user, sidebarOpen,
+        appearance, systemTheme, viewport, plus errors and flash) are on every page;
+        the components below list only the page-specific props (none for these pages).
+servers:
+    - url: http://localhost:8000
+security:
+    - session: []
+      csrf: []
+tags:
+    - name: pages
+    - name: health
+paths:
+    /:
+        get:
+            operationId: showHome
+            summary: Home page
+            description: >-
+                Renders the Inertia component `Welcome` (Route::inertia). Public; links to login,
+                register or the dashboard depending on `auth.user`.
+            tags: [pages]
+            security: []
+            x-route-name: home
+            x-middleware: []
+            x-inertia-component: Welcome
+            x-inertia-props:
+                page: []
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                        flash,
+                    ]
+            responses:
+                '200':
+                    description: HTML shell, or the Inertia page object for an Inertia XHR.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+    /dashboard:
+        get:
+            operationId: showDashboard
+            summary: Dashboard
+            description: Renders the Inertia component `Dashboard` for a verified user.
+            tags: [pages]
+            x-route-name: dashboard
+            x-middleware: [auth, verified]
+            x-inertia-component: Dashboard
+            x-inertia-props:
+                page: []
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                        flash,
+                    ]
+            responses:
+                '200':
+                    description: HTML shell, or the Inertia page object for an Inertia XHR.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: JSON request by a user whose email is not verified.
+    /up:
+        get:
+            operationId: getHealth
+            summary: Health check
+            description: >-
+                Laravel's built-in health endpoint (`withRouting(health: '/up')`), used by the
+                Compose and production container health checks. Has no middleware and no route name;
+                dispatches `DiagnosingHealth` and returns the rendered health view.
+            tags: [health]
+            security: []
+            x-route-name: null
+            x-middleware: []
+            responses:
+                '200':
+                    description: The application is up.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                '500':
+                    description: The application failed to boot or an exception occurred.
+components:
+    securitySchemes:
+        session:
+            type: apiKey
+            in: cookie
+            name: laravel-session
+            description: >-
+                Laravel session cookie (SESSION_COOKIE, default `<app-name>-session`; the session is stored in Redis).
+                Users are identified only by this session; no user id appears in any route path
+                (the one framework deviation is documented on `verifyEmail` in base-auth).
+        csrf:
+            type: apiKey
+            in: header
+            name: X-XSRF-TOKEN
+            description: >-
+                CSRF token. Laravel sets the `XSRF-TOKEN` cookie; send its decoded value in the
+                `X-XSRF-TOKEN` header on every non-GET request. A missing or wrong token yields 419.
+    headers:
+        Location:
+            description: Target of the redirect.
+            schema:
+                type: string
+    schemas:
+        InertiaPage:
+            type: object
+            description: Inertia page object returned for Inertia XHR requests.
+            required: [component, props, url, version]
+            properties:
+                component:
+                    type: string
+                props:
+                    $ref: '#/components/schemas/InertiaSharedProps'
+                url:
+                    type: string
+                version:
+                    type: [string, 'null']
+        ValidationError:
+            type: object
+            description: Laravel validation failure (JSON requests, status 422).
+            required: [message, errors]
+            properties:
+                message:
+                    type: string
+                    example: The given data was invalid.
+                errors:
+                    type: object
+                    additionalProperties:
+                        type: array
+                        items:
+                            type: string
+        MessageResponse:
+            type: object
+            required: [message]
+            properties:
+                message:
+                    type: string
+        InertiaSharedProps:
+            type: object
+            description: >-
+                Props shared with every Inertia page by `HandleInertiaRequests::share()`
+                (plus Inertia's own `errors` and `flash`).
+            required:
+                [name, auth, sidebarOpen, appearance, systemTheme, viewport]
+            properties:
+                name:
+                    type: string
+                    description: config('app.name').
+                auth:
+                    type: object
+                    required: [user]
+                    properties:
+                        user:
+                            oneOf:
+                                - $ref: '#/components/schemas/User'
+                                - type: 'null'
+                sidebarOpen:
+                    type: boolean
+                    description: False only when the `sidebar_state` cookie is present and not `true`.
+                appearance:
+                    type: string
+                    enum: [light, dark, system]
+                    description: From the `appearance` cookie; `system` when absent or invalid.
+                systemTheme:
+                    type: string
+                    enum: [light, dark]
+                    description: From the `system_theme` cookie; `light` unless it is `dark`.
+                viewport:
+                    type: object
+                    required: [width, height]
+                    properties:
+                        width:
+                            type: integer
+                        height:
+                            type: integer
+                    description: >-
+                        Parsed from the `viewport` cookie (`<width>x<height>`, 2 to 5 digits each);
+                        defaults to 1280x800.
+                errors:
+                    type: object
+                    description: Validation errors of the previous request, keyed by field.
+                    additionalProperties:
+                        type: string
+                flash:
+                    type: object
+                    description: >-
+                        One-time data. Settings controllers flash `toast` = {type, message}.
+                    additionalProperties: true
+        User:
+            type: object
+            description: >-
+                The authenticated user as serialized by the User model. Hidden attributes
+                (`password`, `two_factor_secret`, `two_factor_recovery_codes`, `remember_token`) are never sent.
+            required: [id, name, email]
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                email_verified_at:
+                    type: [string, 'null']
+                    format: date-time
+                two_factor_confirmed_at:
+                    type: [string, 'null']
+                    format: date-time
+                created_at:
+                    type: [string, 'null']
+                    format: date-time
+                updated_at:
+                    type: [string, 'null']
+                    format: date-time
+    responses:
+        Unauthenticated:
+            description: >-
+                Not logged in. HTML and Inertia requests get a 302 redirect to `/login`;
+                JSON requests (`Accept: application/json`) get 401.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Unauthenticated.
+        AlreadyAuthenticated:
+            description: Logged-in users are redirected to `/dashboard` by the `guest` middleware.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        EmailNotVerified:
+            description: >-
+                The `verified` middleware redirects unverified users to `/email/verify`
+                (JSON requests get 403 `Your email address is not verified.`).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        PasswordConfirmationRequired:
+            description: >-
+                The `password.confirm` middleware (RequirePassword). HTML and Inertia requests are redirected
+                to `/user/confirm-password`; JSON requests get 423. The confirmation lasts
+                `auth.password_timeout` seconds (900 by default).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Password confirmation required.
+        CsrfMismatch:
+            description: Missing or invalid CSRF token (page expired).
+        ValidationFailed:
+            description: >-
+                Validation failed. JSON requests get 422 with this body. HTML and Inertia
+                requests get a redirect back to the previous page with the errors flashed to the
+                session (exposed as the shared `errors` prop).
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/ValidationError'
+        TooManyRequests:
+            description: Rate limit exceeded; the response carries `Retry-After`.
+            headers:
+                Retry-After:
+                    schema:
+                        type: integer
