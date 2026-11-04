@@ -14,7 +14,11 @@ describe('MD3 themes', () => {
             .filter(
                 (role) =>
                     !role.startsWith('on-') &&
-                    !role.startsWith('surface-') &&
+                    ![
+                        'surface-bright',
+                        'surface-light',
+                        'surface-variant',
+                    ].includes(role) &&
                     !role.startsWith('inverse-') &&
                     !role.startsWith('outline'),
             )

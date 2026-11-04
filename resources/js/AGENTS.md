@@ -7,7 +7,8 @@ Full rules: [Inertia, Vue, and Vuetify](../../resources/docs/agents/frontend.md)
   `AppRoot` only, `auth/*` uses `AuthLayout`, `settings/*` uses `AppLayout`
   with the settings layout, everything else uses `AppLayout`. `/` renders the
   `Welcome` page; the `auth` middleware sends guests who open a signed-in page
-  to login.
+  to login. The signed-in shell (`AppLayout`) is described in
+  [App shell](../../resources/docs/agents/frontend.md#app-shell).
 - Auth pages pass `AuthLayout` its props with `defineOptions({ layout: {...} })`,
   or `layout: (pageProps) => ({...})` when a value comes from page props:
   `title`, `description`, optional `icon`, `switchLink` and `footer`
@@ -18,7 +19,8 @@ Full rules: [Inertia, Vue, and Vuetify](../../resources/docs/agents/frontend.md)
   one aggregate go in `components/{aggregates}/`.
 - Composables are `composables/useX.ts`; helpers go in `lib/` with a colocated
   `*.test.ts`; types go in `types/` and are re-exported from `types/index.ts`.
-  Keep `types/global.d.ts` in sync with `HandleInertiaRequests::share()`.
+  Keep `types/global.d.ts` in sync with `HandleInertiaRequests::share()`
+  (shared props, including the SSR cookies).
 - Use `<script setup lang="ts">`, typed props, and the `@/` alias.
 - Vuetify components are registered globally in `app.ts`; import any other
   component locally from `vuetify/components` or add it to that list. Use theme

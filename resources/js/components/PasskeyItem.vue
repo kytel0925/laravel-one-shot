@@ -52,9 +52,17 @@ const handleDelete = () => {
         </template>
     </v-list-item>
 
-    <v-dialog v-model="open" max-width="480">
+    <v-dialog
+        v-model="open"
+        max-width="480"
+        aria-labelledby="remove-passkey-title"
+    >
         <v-card rounded="xl">
-            <v-card-title class="text-headline-small pt-6 px-6">
+            <v-card-title
+                id="remove-passkey-title"
+                tag="h2"
+                class="text-headline-small pt-6 px-6"
+            >
                 Remove passkey
             </v-card-title>
             <v-card-text class="text-body-medium px-6">

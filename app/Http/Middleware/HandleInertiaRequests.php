@@ -52,8 +52,9 @@ class HandleInertiaRequests extends Middleware
 
     /**
      * The browser window size reported by the `viewport` cookie, so server
-     * rendering picks the same Vuetify breakpoints as the browser. Defaults
-     * to a desktop window on the first visit.
+     * rendering picks the same Vuetify breakpoints as the browser. On the
+     * first visit it guesses from the client hints / user agent: a phone
+     * window for mobile browsers, a desktop window otherwise.
      *
      * @return array{width: int, height: int}
      */
@@ -65,6 +66,9 @@ class HandleInertiaRequests extends Middleware
             return ['width' => (int) $matches[1], 'height' => (int) $matches[2]];
         }
 
-        return ['width' => 1280, 'height' => 800];
+        $mobile = $request->header('Sec-CH-UA-Mobile') === '?1'
+            || preg_match('/Mobi|Android|iPhone/i', (string) $request->userAgent()) === 1;
+
+        return $mobile ? ['width' => 390, 'height' => 844] : ['width' => 1280, 'height' => 800];
     }
 }

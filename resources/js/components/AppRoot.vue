@@ -23,10 +23,12 @@ onMounted(() => {
     <v-app>
         <slot />
 
+        <!-- MD3 snackbar: inverse surface, inverse-primary action. -->
         <v-snackbar-queue
             v-model="snackbarQueue"
             location="bottom center"
-            closable
+            color="inverse-surface"
+            closable="inverse-primary"
             data-test="snackbar-queue"
         />
     </v-app>

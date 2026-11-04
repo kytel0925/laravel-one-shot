@@ -72,8 +72,8 @@ const stack = [
 
     <v-main class="bg-background">
         <div class="page-container py-8">
-            <v-row align="stretch">
-                <v-col cols="12" md="7">
+            <div class="welcome-grid">
+                <div>
                     <v-card
                         color="surface-container-low"
                         rounded="xl"
@@ -81,7 +81,7 @@ const stack = [
                         flat
                     >
                         <v-card-item class="pt-6 px-6">
-                            <v-card-title class="text-headline-small">
+                            <v-card-title tag="h1" class="text-headline-small">
                                 Let's get started
                             </v-card-title>
                             <v-card-subtitle class="text-body-large text-wrap">
@@ -116,9 +116,9 @@ const stack = [
                             </v-btn>
                         </v-card-actions>
                     </v-card>
-                </v-col>
+                </div>
 
-                <v-col cols="12" md="5">
+                <div>
                     <v-card
                         color="primary-container"
                         rounded="xl"
@@ -126,7 +126,7 @@ const stack = [
                         flat
                     >
                         <v-card-item class="pt-6 px-6">
-                            <v-card-title class="text-title-large">
+                            <v-card-title tag="h2" class="text-title-large">
                                 What's inside
                             </v-card-title>
                             <v-card-subtitle class="text-body-medium text-wrap">
@@ -143,8 +143,22 @@ const stack = [
                             </v-chip>
                         </v-card-text>
                     </v-card>
-                </v-col>
-            </v-row>
+                </div>
+            </div>
         </div>
     </v-main>
 </template>
+
+<style scoped>
+/* One column on compact screens, 7/5 from the 960px contract width. */
+.welcome-grid {
+    display: grid;
+    gap: 24px;
+}
+
+@media (min-width: 960px) {
+    .welcome-grid {
+        grid-template-columns: 7fr 5fr;
+    }
+}
+</style>

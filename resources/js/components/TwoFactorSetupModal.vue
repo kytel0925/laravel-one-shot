@@ -76,6 +76,13 @@ const handleModalNextStep = () => {
     isOpen.value = false;
 };
 
+// After a wrong code, put the cursor back in the first OTP box.
+const focusOtp = () => {
+    void nextTick(() =>
+        pinInputContainerRef.value?.querySelector('input')?.focus(),
+    );
+};
+
 const resetModalState = () => {
     if (props.twoFactorEnabled) {
         clearSetupData();
@@ -105,6 +112,7 @@ watch(
     <v-dialog
         :model-value="isOpen"
         max-width="480"
+        aria-labelledby="two-factor-setup-title"
         @update:model-value="isOpen = $event"
     >
         <v-card rounded="xl">
@@ -114,7 +122,11 @@ watch(
                         <v-icon icon="mdi-qrcode-scan" />
                     </v-avatar>
                 </template>
-                <v-card-title class="text-headline-small text-wrap">
+                <v-card-title
+                    id="two-factor-setup-title"
+                    tag="h2"
+                    class="text-headline-small text-wrap"
+                >
                     {{ modalConfig.title }}
                 </v-card-title>
             </v-card-item>
@@ -171,11 +183,26 @@ watch(
                             hide-details
                             label="Setup key"
                             class="text-mono"
-                            :append-inner-icon="
-                                copied ? 'mdi-check' : 'mdi-content-copy'
-                            "
-                            @click:append-inner="copy(manualSetupKey || '')"
-                        />
+                        >
+                            <template #append-inner>
+                                <v-btn
+                                    :icon="
+                                        copied
+                                            ? 'mdi-check'
+                                            : 'mdi-content-copy'
+                                    "
+                                    :aria-label="
+                                        copied
+                                            ? 'Setup key copied'
+                                            : 'Copy setup key'
+                                    "
+                                    variant="text"
+                                    color="on-surface-variant"
+                                    density="comfortable"
+                                    @click="copy(manualSetupKey || '')"
+                                />
+                            </template>
+                        </v-text-field>
                         <v-progress-linear v-else indeterminate />
                     </div>
                 </template>
@@ -187,6 +214,7 @@ watch(
                     reset-on-error
                     @finish="code = ''"
                     @success="isOpen = false"
+                    @error="focusOtp"
                     v-slot="{ errors, processing }"
                 >
                     <input type="hidden" name="code" :value="code" />

@@ -22,7 +22,7 @@ const focusPassword = () => {
         title="Delete account"
         description="Delete your account and all of its resources"
     >
-        <p class="text-body-medium text-on-error-container">
+        <p class="text-body-medium on-error-container">
             Warning: please proceed with caution, this cannot be undone.
         </p>
 
@@ -38,7 +38,11 @@ const focusPassword = () => {
         </template>
     </SettingsSection>
 
-    <v-dialog v-model="open" max-width="480">
+    <v-dialog
+        v-model="open"
+        max-width="480"
+        aria-labelledby="delete-account-title"
+    >
         <Form
             v-bind="ProfileController.destroy.form()"
             reset-on-success
@@ -49,7 +53,11 @@ const focusPassword = () => {
             v-slot="{ errors, processing, reset, clearErrors }"
         >
             <v-card rounded="xl">
-                <v-card-title class="text-headline-small text-wrap pt-6 px-6">
+                <v-card-title
+                    id="delete-account-title"
+                    tag="h2"
+                    class="text-headline-small text-wrap pt-6 px-6"
+                >
                     Are you sure you want to delete your account?
                 </v-card-title>
                 <v-card-text class="px-6">

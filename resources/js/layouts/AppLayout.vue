@@ -2,7 +2,6 @@
 import { usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import { useDisplay } from 'vuetify';
-import AppBottomNav from '@/components/AppBottomNav.vue';
 import AppDrawer from '@/components/AppDrawer.vue';
 import AppMobileBar from '@/components/AppMobileBar.vue';
 import AppTopBar from '@/components/AppTopBar.vue';
@@ -18,6 +17,8 @@ const page = usePage();
 // The drawer collapses to a rail; the choice is kept in the `sidebar_state`
 // cookie so the server renders the same width (HandleInertiaRequests).
 const rail = ref(!page.props.sidebarOpen);
+// Compact screens: modal drawer opened from the app bar.
+const drawerOpen = ref(false);
 
 watch(rail, (value) => {
     document.cookie = `sidebar_state=${!value};path=/;max-age=${60 * 60 * 24 * 7};SameSite=Lax`;
@@ -30,8 +31,11 @@ watch(rail, (value) => {
         <AppTopBar :breadcrumbs="breadcrumbs" @toggle-rail="rail = !rail" />
     </template>
     <template v-else>
-        <AppMobileBar :breadcrumbs="breadcrumbs" />
-        <AppBottomNav />
+        <AppMobileBar
+            :breadcrumbs="breadcrumbs"
+            @open-drawer="drawerOpen = true"
+        />
+        <AppDrawer v-model:open="drawerOpen" modal />
     </template>
 
     <v-main class="bg-background">

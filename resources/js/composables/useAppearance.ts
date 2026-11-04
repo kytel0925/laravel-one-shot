@@ -1,5 +1,5 @@
-import type { ComputedRef, Ref } from 'vue';
-import { computed, ref } from 'vue';
+import type { App, ComputedRef, InjectionKey, Ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 import { useTheme } from 'vuetify';
 import type { Appearance, ResolvedAppearance } from '@/types';
 
@@ -39,7 +39,12 @@ export function renderedTheme(
     return systemTheme === 'dark' ? 'dark' : 'light';
 }
 
-const appearance = ref<Appearance>('system');
+const AppearanceKey: InjectionKey<Ref<Appearance>> = Symbol('appearance');
+
+/** Called once per app in app.ts with the server's appearance. */
+export function provideAppearance(app: App, value: Appearance): void {
+    app.provide(AppearanceKey, ref(value));
+}
 
 function setCookie(name: string, value: string, days = 365): void {
     if (typeof document === 'undefined') {
@@ -51,6 +56,7 @@ function setCookie(name: string, value: string, days = 365): void {
 
 export function useAppearance(): UseAppearanceReturn {
     const theme = useTheme();
+    const appearance = inject(AppearanceKey, ref<Appearance>('system'));
 
     const resolvedAppearance = computed<ResolvedAppearance>(() =>
         theme.current.value.dark ? 'dark' : 'light',
@@ -64,9 +70,4 @@ export function useAppearance(): UseAppearanceReturn {
     }
 
     return { appearance, resolvedAppearance, updateAppearance };
-}
-
-/** Keeps the shared ref in step with the theme chosen when the app booted. */
-export function syncAppearance(value: Appearance): void {
-    appearance.value = value;
 }

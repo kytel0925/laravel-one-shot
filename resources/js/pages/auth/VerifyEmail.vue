@@ -29,6 +29,7 @@ defineProps<{
     <Form v-bind="send.form()" v-slot="{ processing }">
         <v-btn
             type="submit"
+            variant="flat"
             color="primary"
             size="large"
             block

@@ -1,6 +1,15 @@
 import type { ThemeDefinition } from 'vuetify';
 
 /**
+ * Supporting text (`text-medium-emphasis`, field labels, card subtitles)
+ * renders on-surface at this opacity; 0.72 keeps it above 4.5:1 on every
+ * surface role in both themes (MD3 on-surface-variant is ~0.70 equivalent).
+ */
+const variables = {
+    'medium-emphasis-opacity': 0.72,
+};
+
+/**
  * Material Design 3 baseline color roles (seed #6750A4), applied over
  * Vuetify's md3 blueprint. Change colors here only; components use the role
  * names (`color="primary-container"`, `bg-surface-container`), never hex.
@@ -8,10 +17,14 @@ import type { ThemeDefinition } from 'vuetify';
  * The themes are named `light` and `dark` so Vuetify's `system` theme can
  * follow the operating system preference.
  */
+/** Light primary; also the Inertia progress bar color in app.ts. */
+export const primaryColor = '#6750A4';
+
 export const lightTheme: ThemeDefinition = {
     dark: false,
+    variables,
     colors: {
-        primary: '#6750A4',
+        primary: primaryColor,
         'on-primary': '#FFFFFF',
         'primary-container': '#EADDFF',
         'on-primary-container': '#21005D',
@@ -46,7 +59,11 @@ export const lightTheme: ThemeDefinition = {
         'surface-container': '#F3EDF7',
         'surface-container-high': '#ECE6F0',
         'surface-container-highest': '#E6E0E9',
+        'on-surface-container-lowest': '#1D1B20',
+        'on-surface-container-low': '#1D1B20',
         'on-surface-container': '#1D1B20',
+        'on-surface-container-high': '#1D1B20',
+        'on-surface-container-highest': '#1D1B20',
         outline: '#79747E',
         'outline-variant': '#CAC4D0',
         'inverse-surface': '#322F35',
@@ -57,6 +74,7 @@ export const lightTheme: ThemeDefinition = {
 
 export const darkTheme: ThemeDefinition = {
     dark: true,
+    variables,
     colors: {
         primary: '#D0BCFF',
         'on-primary': '#381E72',
@@ -93,7 +111,11 @@ export const darkTheme: ThemeDefinition = {
         'surface-container': '#211F26',
         'surface-container-high': '#2B2930',
         'surface-container-highest': '#36343B',
+        'on-surface-container-lowest': '#E6E0E9',
+        'on-surface-container-low': '#E6E0E9',
         'on-surface-container': '#E6E0E9',
+        'on-surface-container-high': '#E6E0E9',
+        'on-surface-container-highest': '#E6E0E9',
         outline: '#938F99',
         'outline-variant': '#49454F',
         'inverse-surface': '#E6E0E9',

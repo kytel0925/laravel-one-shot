@@ -4,8 +4,15 @@ import type { FlashToast } from '@/types/ui';
 
 export type SnackbarMessage = {
     text: string;
-    color: FlashToast['type'];
+    prependIcon: string;
     timeout: number;
+};
+
+const icons: Record<FlashToast['type'], string> = {
+    success: 'mdi-check-circle-outline',
+    info: 'mdi-information-outline',
+    warning: 'mdi-alert-outline',
+    error: 'mdi-alert-circle-outline',
 };
 
 /** Messages shown by the `<v-snackbar-queue>` in `AppRoot.vue`. */
@@ -14,7 +21,7 @@ export const snackbarQueue = ref<SnackbarMessage[]>([]);
 export function showToast(toast: FlashToast): void {
     snackbarQueue.value.push({
         text: toast.message,
-        color: toast.type,
+        prependIcon: icons[toast.type],
         timeout: toast.type === 'error' ? 8000 : 4000,
     });
 }

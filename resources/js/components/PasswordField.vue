@@ -10,12 +10,17 @@ const visible = ref(false);
 </script>
 
 <template>
-    <v-text-field
-        :type="visible ? 'text' : 'password'"
-        :append-inner-icon="visible ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-        :append-inner-icon-aria-label="
-            visible ? 'Hide password' : 'Show password'
-        "
-        @click:append-inner="visible = !visible"
-    />
+    <v-text-field :type="visible ? 'text' : 'password'">
+        <template #append-inner>
+            <v-btn
+                :icon="visible ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                :aria-label="visible ? 'Hide password' : 'Show password'"
+                :aria-pressed="visible"
+                variant="text"
+                color="on-surface-variant"
+                density="comfortable"
+                @click="visible = !visible"
+            />
+        </template>
+    </v-text-field>
 </template>

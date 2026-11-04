@@ -9,6 +9,8 @@ import type { BreadcrumbItem } from '@/types';
 const { breadcrumbs } = defineProps<{ breadcrumbs: BreadcrumbItem[] }>();
 
 const title = computed(() => breadcrumbs.at(-1)?.title);
+
+const emit = defineEmits<{ openDrawer: [] }>();
 </script>
 
 <template>
@@ -18,6 +20,11 @@ const title = computed(() => breadcrumbs.at(-1)?.title);
         data-test="app-mobile-bar"
     >
         <template #prepend>
+            <v-app-bar-nav-icon
+                aria-label="Open navigation"
+                data-test="mobile-drawer-toggle"
+                @click="emit('openDrawer')"
+            />
             <Link
                 :href="dashboard()"
                 class="mobile-home ms-2"

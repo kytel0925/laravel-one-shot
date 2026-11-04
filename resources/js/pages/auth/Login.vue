@@ -76,6 +76,7 @@ defineProps<{
 
         <v-btn
             type="submit"
+            variant="flat"
             color="primary"
             size="large"
             block

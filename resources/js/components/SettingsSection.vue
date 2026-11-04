@@ -22,7 +22,9 @@ const {
         rounded="xl"
     >
         <v-card-item>
-            <v-card-title class="text-title-medium">{{ title }}</v-card-title>
+            <v-card-title tag="h2" class="text-title-medium">{{
+                title
+            }}</v-card-title>
             <v-card-subtitle
                 v-if="description"
                 class="text-body-medium text-wrap"

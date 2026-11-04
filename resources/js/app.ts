@@ -35,7 +35,6 @@ import {
     VListItem,
     VListItemSubtitle,
     VListItemTitle,
-    VListSubheader,
     VMain,
     VMenu,
     VNavigationDrawer,
@@ -48,8 +47,6 @@ import {
     VSnackbarQueue,
     VSpacer,
     VTextField,
-    VToolbar,
-    VToolbarTitle,
     VTooltip,
 } from 'vuetify/components';
 import * as directives from 'vuetify/directives';
@@ -57,14 +54,14 @@ import { en } from 'vuetify/locale';
 import AppRoot from '@/components/AppRoot.vue';
 import {
     initialAppearance,
+    provideAppearance,
     renderedTheme,
-    syncAppearance,
 } from '@/composables/useAppearance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
-import { darkTheme, lightTheme } from '@/lib/theme';
+import { darkTheme, lightTheme, primaryColor } from '@/lib/theme';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -85,7 +82,8 @@ void createInertiaApp({
     },
     withApp: (app, { page }) => {
         const appearance = initialAppearance(page.props.appearance);
-        syncAppearance(appearance);
+        // Per app instance, so concurrent SSR requests never share it.
+        provideAppearance(app, appearance);
 
         app.use(
             createVuetify({
@@ -127,7 +125,6 @@ void createInertiaApp({
                     VListItem,
                     VListItemSubtitle,
                     VListItemTitle,
-                    VListSubheader,
                     VMain,
                     VMenu,
                     VNavigationDrawer,
@@ -140,8 +137,6 @@ void createInertiaApp({
                     VSnackbarQueue,
                     VSpacer,
                     VTextField,
-                    VToolbar,
-                    VToolbarTitle,
                     VTooltip,
                 },
                 directives,
@@ -189,7 +184,7 @@ void createInertiaApp({
         });
     },
     progress: {
-        color: '#6750A4',
+        color: primaryColor,
     },
 });
 
