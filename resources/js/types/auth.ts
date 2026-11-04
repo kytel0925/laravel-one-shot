@@ -1,3 +1,5 @@
+import type { InertiaLinkProps } from '@inertiajs/vue3';
+
 export type User = {
     id: number;
     name: string;
@@ -26,4 +28,12 @@ export type TwoFactorConfigContent = {
     title: string;
     description: string;
     buttonText: string;
+};
+
+/** A link passed to `AuthLayout` (`switchLink`, `footer`). */
+export type AuthLink = {
+    /** Text before the link ("Don't have an account?"). */
+    text?: string;
+    label: string;
+    href: NonNullable<InertiaLinkProps['href']>;
 };

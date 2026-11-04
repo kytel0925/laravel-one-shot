@@ -15,14 +15,14 @@ The first start installs Composer and npm dependencies, generates `APP_KEY`,
 runs the migrations, and then starts Octane, the Vite dev server and a queue
 worker. Watch the progress with `docker compose logs -f app`.
 
-| Service           | URL / port                                     |
-| ----------------- | ---------------------------------------------- |
-| Application       | http://localhost:8000                          |
-| Vite dev server   | http://localhost:5173                          |
-| Mailpit (web UI)  | http://localhost:8025                          |
-| RabbitMQ (web UI) | http://localhost:15672 (`guest` / `guest`)     |
-| PostgreSQL        | `localhost:5432` (`laravel` / `secret`)        |
-| Redis             | `localhost:6379`                               |
+| Service           | URL / port                                 |
+| ----------------- | ------------------------------------------ |
+| Application       | http://localhost:8000                      |
+| Vite dev server   | http://localhost:5173                      |
+| Mailpit (web UI)  | http://localhost:8025                      |
+| RabbitMQ (web UI) | http://localhost:15672 (`guest` / `guest`) |
+| PostgreSQL        | `localhost:5432` (`laravel` / `secret`)    |
+| Redis             | `localhost:6379`                           |
 
 Each published port can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, …).
 

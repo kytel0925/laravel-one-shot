@@ -2,11 +2,6 @@
 import type { UrlMethodPair } from '@inertiajs/core';
 import { router } from '@inertiajs/vue3';
 import { usePasskeyVerify } from '@laravel/passkeys/vue';
-import { KeyRound } from '@lucide/vue';
-import InputError from '@/components/InputError.vue';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Spinner } from '@/components/ui/spinner';
 
 type Props = {
     routes?: {
@@ -36,38 +31,35 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
 </script>
 
 <template>
-    <div v-if="isSupported">
-        <div class="grid gap-2">
-            <Button
-                type="button"
-                variant="outline"
-                class="w-full"
-                @click="verify"
-                :disabled="isLoading"
+    <div v-if="isSupported" class="d-flex flex-column ga-4">
+        <v-btn
+            type="button"
+            variant="outlined"
+            color="primary"
+            size="large"
+            block
+            prepend-icon="mdi-key-chain-variant"
+            :loading="isLoading"
+            :disabled="isLoading"
+            @click="verify"
+        >
+            {{
+                isLoading
+                    ? (props.loadingLabel ?? 'Authenticating...')
+                    : (props.label ?? 'Sign in with a passkey')
+            }}
+        </v-btn>
+
+        <v-alert v-if="error" type="error">{{ error }}</v-alert>
+
+        <div class="d-flex align-center ga-4">
+            <v-divider />
+            <span
+                class="text-label-small text-medium-emphasis text-uppercase text-no-wrap"
             >
-                <Spinner v-if="isLoading" />
-                <KeyRound v-else class="h-4 w-4" />
-                {{
-                    isLoading
-                        ? (props.loadingLabel ?? 'Authenticating...')
-                        : (props.label ?? 'Sign in with a passkey')
-                }}
-            </Button>
-
-            <div v-if="error" class="text-center">
-                <InputError :message="error" />
-            </div>
-        </div>
-
-        <div class="relative my-6">
-            <div class="absolute inset-0 flex items-center">
-                <Separator class="w-full" />
-            </div>
-            <div class="relative flex justify-center text-xs uppercase">
-                <span class="bg-background px-2 text-muted-foreground">
-                    {{ props.separator ?? 'Or continue with email' }}
-                </span>
-            </div>
+                {{ props.separator ?? 'Or continue with email' }}
+            </span>
+            <v-divider />
         </div>
     </div>
 </template>

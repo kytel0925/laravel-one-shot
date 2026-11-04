@@ -1,32 +1,35 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"  @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-appearance="{{ $appearance ?? 'system' }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        {{-- Inline script to detect system dark mode preference and apply it immediately --}}
+        {{-- Paint the theme background before Vuetify boots, so a dark appearance does not flash white,
+             and remember what the server cannot see (OS color scheme, window size) for SSR. --}}
         <script>
-            (function() {
+            (function () {
                 const appearance = '{{ $appearance ?? "system" }}';
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const dark = appearance === 'dark' || (appearance === 'system' && systemDark);
 
-                if (appearance === 'system') {
-                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                // Lets the server render the `system` appearance in the OS color scheme next time.
+                document.cookie = 'system_theme=' + (systemDark ? 'dark' : 'light') + ';path=/;max-age=31536000;SameSite=Lax';
+                // Lets the server render the layout for this window width (Vuetify's useDisplay()).
+                document.cookie = 'viewport=' + window.innerWidth + 'x' + window.innerHeight + ';path=/;max-age=31536000;SameSite=Lax';
 
-                    if (prefersDark) {
-                        document.documentElement.classList.add('dark');
-                    }
-                }
+                document.documentElement.dataset.theme = dark ? 'dark' : 'light';
             })();
         </script>
 
-        {{-- Inline style to set the HTML background color based on our theme in app.css --}}
+        {{-- Background roles from resources/js/lib/theme.ts (light / dark). --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: #FEF7FF;
             }
 
-            html.dark {
-                background-color: oklch(0.145 0 0);
+            html[data-theme="dark"] {
+                background-color: #141218;
+                color-scheme: dark;
             }
         </style>
 
@@ -36,12 +39,12 @@
 
         @fonts
 
-        @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
+        @vite(['resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
         <x-inertia::head>
             <title>{{ config('app.name', 'Laravel') }}</title>
         </x-inertia::head>
     </head>
-    <body class="font-sans antialiased">
+    <body>
         <x-inertia::app />
     </body>
 </html>

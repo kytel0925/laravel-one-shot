@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
-import { ShieldCheck } from '@lucide/vue';
 import { onUnmounted, ref } from 'vue';
-import Heading from '@/components/Heading.vue';
+import SettingsSection from '@/components/SettingsSection.vue';
 import TwoFactorRecoveryCodes from '@/components/TwoFactorRecoveryCodes.vue';
 import TwoFactorSetupModal from '@/components/TwoFactorSetupModal.vue';
-import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/composables/useTwoFactorAuth';
 import { disable, enable } from '@/routes/two-factor';
 
@@ -28,66 +26,73 @@ onUnmounted(() => clearTwoFactorAuthData());
 </script>
 
 <template>
-    <div v-if="canManageTwoFactor" class="space-y-6">
-        <Heading
-            variant="small"
-            title="Two-factor authentication"
-            description="Manage your two-factor authentication settings"
-        />
-
-        <div
-            v-if="!twoFactorEnabled"
-            class="flex flex-col items-start justify-start space-y-4"
-        >
-            <p class="text-sm text-muted-foreground">
+    <SettingsSection
+        v-if="canManageTwoFactor"
+        title="Two-factor authentication"
+        description="Manage your two-factor authentication settings"
+    >
+        <template v-if="!twoFactorEnabled">
+            <p class="text-body-medium text-medium-emphasis">
                 When you enable two-factor authentication, you will be prompted
                 for a secure pin during login. This pin can be retrieved from a
                 TOTP-supported application on your phone.
             </p>
 
             <div>
-                <Button v-if="hasSetupData" @click="showSetupModal = true">
-                    <ShieldCheck />Continue setup
-                </Button>
+                <v-btn
+                    v-if="hasSetupData"
+                    color="primary"
+                    variant="flat"
+                    prepend-icon="mdi-shield-check-outline"
+                    @click="showSetupModal = true"
+                >
+                    Continue setup
+                </v-btn>
                 <Form
                     v-else
                     v-bind="enable.form()"
                     @success="showSetupModal = true"
                     #default="{ processing }"
                 >
-                    <Button type="submit" :disabled="processing">
+                    <v-btn
+                        type="submit"
+                        color="primary"
+                        variant="flat"
+                        :loading="processing"
+                    >
                         Enable 2FA
-                    </Button>
+                    </v-btn>
                 </Form>
             </div>
-        </div>
+        </template>
 
-        <div v-else class="flex flex-col items-start justify-start space-y-4">
-            <p class="text-sm text-muted-foreground">
+        <template v-else>
+            <p class="text-body-medium text-medium-emphasis">
                 You will be prompted for a secure, random pin during login,
                 which you can retrieve from the TOTP-supported application on
                 your phone.
             </p>
 
-            <div class="relative inline">
+            <div>
                 <Form v-bind="disable.form()" #default="{ processing }">
-                    <Button
-                        variant="destructive"
+                    <v-btn
                         type="submit"
-                        :disabled="processing"
+                        color="error"
+                        variant="flat"
+                        :loading="processing"
                     >
                         Disable 2FA
-                    </Button>
+                    </v-btn>
                 </Form>
             </div>
 
             <TwoFactorRecoveryCodes />
-        </div>
+        </template>
 
         <TwoFactorSetupModal
             v-model:isOpen="showSetupModal"
             :requiresConfirmation="requiresConfirmation"
             :twoFactorEnabled="twoFactorEnabled"
         />
-    </div>
+    </SettingsSection>
 </template>

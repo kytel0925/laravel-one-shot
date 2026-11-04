@@ -2,18 +2,25 @@
 import { usePage } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 
+const { showName = true } = defineProps<{ showName?: boolean }>();
+
 const name = usePage().props.name;
 </script>
 
 <template>
-    <div
-        class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
-    >
-        <AppLogoIcon class="size-5 fill-current text-white dark:text-black" />
-    </div>
-    <div class="ml-1 grid flex-1 text-left text-sm">
-        <span class="mb-0.5 truncate leading-tight font-semibold">{{
-            name
-        }}</span>
+    <div class="app-logo d-flex align-center ga-3">
+        <v-avatar color="primary" rounded="lg" size="36">
+            <AppLogoIcon class="app-logo__icon" />
+        </v-avatar>
+        <span v-if="showName" class="text-title-medium text-truncate">
+            {{ name }}
+        </span>
     </div>
 </template>
+
+<style scoped>
+.app-logo__icon {
+    width: 20px;
+    height: 20px;
+}
+</style>

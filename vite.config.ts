@@ -1,6 +1,5 @@
 import inertia from '@inertiajs/vite';
 import { wayfinder } from '@laravel/vite-plugin-wayfinder';
-import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
@@ -9,16 +8,18 @@ import { defineConfig, lazyPlugins } from 'vite-plus';
 export default defineConfig({
     plugins: lazyPlugins(() => [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.ts'],
+            input: ['resources/js/app.ts'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
+                bunny('Roboto', {
+                    weights: [400, 500, 700],
+                }),
+                bunny('Roboto Mono', {
+                    weights: [400, 500],
                 }),
             ],
         }),
         inertia(),
-        tailwindcss(),
         vue({
             template: {
                 transformAssetUrls: {
@@ -31,11 +32,19 @@ export default defineConfig({
             formVariants: true,
         }),
     ]),
+    // Vuetify ships CSS imports inside its ES modules; bundle it for SSR so
+    // Node never tries to import a .css file.
+    ssr: {
+        noExternal: ['vuetify'],
+    },
     server: {
         // In Docker the dev server listens on 0.0.0.0; browsers must load it
         // through the published host name instead (docker-compose.yml).
         hmr: process.env.VITE_HMR_HOST
-            ? { host: process.env.VITE_HMR_HOST }
+            ? {
+                  host: process.env.VITE_HMR_HOST,
+                  clientPort: Number(process.env.VITE_PORT ?? 5173),
+              }
             : undefined,
         watch: {
             ignored: [
@@ -53,9 +62,7 @@ export default defineConfig({
             'node_modules/**',
             'public/**',
             'bootstrap/ssr/**',
-            'tailwind.config.js',
             'resources/js/actions/**',
-            'resources/js/components/ui/*',
             'resources/js/routes/**',
             'resources/js/wayfinder/**',
         ],
@@ -74,12 +81,7 @@ export default defineConfig({
         ignorePatterns: [
             '.github/**',
             'composer.json',
-            'resources/js/components/ui/*',
             'resources/views/mail/*',
         ],
-        sortTailwindcss: {
-            functions: ['clsx', 'cn', 'cva'],
-            stylesheet: 'resources/css/app.css',
-        },
     },
 });

@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { usePasskeyRegister } from '@laravel/passkeys/vue';
 import { ref } from 'vue';
-import InputError from '@/components/InputError.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 const emit = defineEmits<{
     success: [];
@@ -60,43 +56,41 @@ const handleCancel = () => {
 </script>
 
 <template>
-    <div v-if="!isSupported" class="text-sm text-muted-foreground">
+    <p v-if="!isSupported" class="text-body-medium text-medium-emphasis">
         Passkeys are not supported in this browser.
+    </p>
+
+    <div v-else-if="!showForm">
+        <v-btn variant="tonal" @click="showForm = true">Add passkey</v-btn>
     </div>
 
-    <Button v-else-if="!showForm" variant="outline" @click="showForm = true">
-        Add passkey
-    </Button>
-
-    <form
-        v-else
-        @submit="handleSubmit"
-        class="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
-    >
-        <div class="grid gap-2">
-            <Label for="passkey-name">Passkey name</Label>
-            <Input
+    <v-sheet v-else color="surface-container-high" rounded="lg" class="pa-4">
+        <form class="d-flex flex-column ga-2" @submit="handleSubmit">
+            <v-text-field
                 id="passkey-name"
-                type="text"
                 v-model="name"
-                placeholder="e.g., MacBook Pro, iPhone"
-                class="mt-1 block w-full border-foreground/20"
                 v-focus
+                label="Passkey name"
+                placeholder="e.g., MacBook Pro, iPhone"
+                hint="A name helps you identify this passkey later."
+                persistent-hint
+                :error-messages="error ? [error] : []"
             />
-            <p class="text-xs text-muted-foreground">
-                A name helps you identify this passkey later.
-            </p>
-        </div>
 
-        <InputError v-if="error" :message="error" />
-
-        <div class="flex gap-2">
-            <Button type="submit" :disabled="isLoading || !name.trim()">
-                {{ isLoading ? 'Registering...' : 'Register passkey' }}
-            </Button>
-            <Button type="button" variant="ghost" @click="handleCancel">
-                Cancel
-            </Button>
-        </div>
-    </form>
+            <div class="d-flex ga-2">
+                <v-btn
+                    type="submit"
+                    color="primary"
+                    variant="flat"
+                    :loading="isLoading"
+                    :disabled="!name.trim()"
+                >
+                    {{ isLoading ? 'Registering...' : 'Register passkey' }}
+                </v-btn>
+                <v-btn type="button" variant="text" @click="handleCancel">
+                    Cancel
+                </v-btn>
+            </div>
+        </form>
+    </v-sheet>
 </template>
