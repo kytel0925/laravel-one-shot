@@ -9,7 +9,7 @@
   database, migrates, generates the Wayfinder helpers, and starts Octane on
   FrankenPHP (`--workers=1 --max-requests=1`), the Vite dev server, and
   `queue:listen`. Check for running servers before starting another.
-- Start the stack from the host with `cp -n .env.example .env && docker compose up -d`.
+- Start the stack from the host with `test -f .env || cp .env.example .env; docker compose up -d`.
   Run every other command through `docker compose exec app ...`. Never
   overwrite an existing `.env`: `dev.sh` generates `APP_KEY` into it once, and
   a regenerated key makes Fortify's encrypted two-factor secrets and recovery

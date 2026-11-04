@@ -27,6 +27,10 @@ if [ ! -d node_modules ] || [ "$(stamp package-lock.json)" != "$(cat node_module
 fi
 
 if ! grep -qE '^APP_KEY=.+' .env; then
+    if [ ! -w .env ]; then
+        echo "dev.sh: .env is not writable by uid $(id -u); set APP_UID/APP_GID in .env to the owner of the project (id -u / id -g)." >&2
+        exit 1
+    fi
     php artisan key:generate --no-interaction --force
 fi
 

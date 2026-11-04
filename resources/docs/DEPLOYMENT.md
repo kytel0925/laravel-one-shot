@@ -7,7 +7,7 @@ development and tests, the CI workflow, and the production image. Everything bel
 
 ## Development and test topology (`docker-compose.yml`)
 
-`cp -n .env.example .env && docker compose up -d` starts five services. Compose reads `.env` for the
+`test -f .env || cp .env.example .env; docker compose up -d` starts five services. Compose reads `.env` for the
 `${...}` values; every variable has a default equal to `.env.example`, so the stack also starts before
 `.env` exists.
 
