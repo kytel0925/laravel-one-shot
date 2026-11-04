@@ -52,3 +52,33 @@ jobs:
           name: browser-screenshots
           path: tests/Browser/Screenshots
           if-no-files-found: ignore
+
+  production-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the production image
+        run: docker build -f etc/docker/Dockerfile -t laravel-one-shot:ci .
+
+      # Octane on FrankenPHP must start as www-data and answer the health
+      # route; /up touches no database, cache or queue.
+      - name: Start the image and check /up
+        run: |
+          docker run -d --name app -p 8000:8000 \
+            -e APP_KEY="base64:$(openssl rand -base64 32)" \
+            laravel-one-shot:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/up > /dev/null; then
+              echo "Production image is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
