@@ -59,7 +59,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function viewport(Request $request): array
     {
-        if (preg_match('/^(\d{2,5})x(\d{2,5})$/', (string) $request->cookie('viewport'), $matches) === 1) {
+        $viewport = $request->cookie('viewport');
+
+        if (is_string($viewport) && preg_match('/^(\d{2,5})x(\d{2,5})$/', $viewport, $matches) === 1) {
             return ['width' => (int) $matches[1], 'height' => (int) $matches[2]];
         }
 
