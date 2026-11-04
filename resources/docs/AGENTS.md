@@ -16,9 +16,14 @@ resources/docs/
 └── ER.md                           Mermaid entity-relationship diagram
 ```
 
-The starter kit ships `adr/20261023-documentation-as-specifications.md`,
-`api/base-app.openapi.yaml`, `api/base-auth.openapi.yaml`,
-`api/base-settings.openapi.yaml`, `DEPLOYMENT.md`, and `ER.md`.
+The starter kit ships the five ADRs in `adr/`
+(`20261023-documentation-as-specifications.md`,
+`20261104-asyncapi-domain-events-only.md`,
+`20261104-docker-compose-environment.md`,
+`20261104-tests-against-docker-services.md`, and
+`20261104-vuetify-material-design-3.md`), `api/base-app.openapi.yaml`,
+`api/base-auth.openapi.yaml`, `api/base-settings.openapi.yaml`,
+`DEPLOYMENT.md`, and `ER.md`.
 
 ## When to update
 
@@ -40,9 +45,8 @@ Update the documentation in the same commit as the change that requires it:
   file; add a new `base-<area>` only for a new area. The starter kit has no
   AsyncAPI file because it has no domain events.
 - Each aggregate gets `api/<aggregate>.openapi.yaml`, named in kebab-case
-  after its `src/` folder (`src/TaskLists` → `task-lists`), and an
-  `api/<aggregate>.asyncapi.yaml` only when it dispatches or listens to
-  domain events.
+  after its `src/` folder (`src/TaskLists` → `task-lists`). When it gets an
+  AsyncAPI file is in [AsyncAPI scope](#asyncapi-scope).
 
 ## Writing specs
 
@@ -63,15 +67,14 @@ Update the documentation in the same commit as the change that requires it:
 - Response schemas mirror the Resource: the root's `uuid`, public fields, and
   child identifiers as above; never foreign keys. Document each status the
   route really returns, including `302` redirects, `422`, `423`, and `429`.
-- Known deviation: Fortify's email verification link
-  (`/email/verify/{id}/{hash}`) carries `User.id`, because Fortify compares
-  it with the model key and offers no configuration for it. Never copy it
-  into new specs.
+- Known deviation: two package routes carry numeric ids. Fortify's email
+  verification link (`/email/verify/{id}/{hash}`) carries `User.id`, because
+  Fortify compares it with the model key and offers no configuration for it.
+  The package route `passkey.destroy` (`/user/passkeys/{passkey}`) carries
+  the passkey's numeric id. Never copy either pattern into new specs.
 - Keep every spec self-contained: define its own `components`; do not
   reference other files.
-- AsyncAPI specs follow [AsyncAPI scope](#asyncapi-scope): channel addresses
-  are domain event class names; payloads list the event's public properties.
-  Mark sensitive properties.
+- AsyncAPI specs follow [AsyncAPI scope](#asyncapi-scope).
 
 ## AsyncAPI scope
 
@@ -102,9 +105,14 @@ in `src/{Aggregate}/Events/{Name}.php`, implementing the marker interface
   event's public properties, with sensitive ones marked.
 - An aggregate gets `api/<aggregate>.asyncapi.yaml` only when it dispatches or
   listens to domain events.
-- `tests/Unit/Docs/AsyncApiScopeTest.php` enforces the scope: every channel
-  address must be a class implementing `App\Support\DomainEvent`, and every
-  `DomainEvent` class under `src/` must be documented.
+- `tests/Unit/Docs/AsyncApiScopeTest.php` enforces the scope. Specs are
+  `resources/docs/api/*.asyncapi.yaml` or `*.asyncapi.yml` and declare
+  `asyncapi: 3.x`. Every address in `channels` and `components.channels` must
+  be a class that implements `App\Support\DomainEvent` and
+  `Illuminate\Contracts\Events\ShouldDispatchAfterCommit` and lives in
+  `src/{Aggregate}/Events/` (any depth below `Events`). Every `DomainEvent`
+  class under the `src/` PSR-4 roots must be documented and must live under an
+  `Events/` folder.
 
 ## ADRs
 

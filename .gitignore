@@ -27,7 +27,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-/.agents
 /.amp
 /.cursor
 /.factory
@@ -44,6 +43,6 @@ yarn-error.log
 /tests/Browser/Screenshots
 
 # Agent instructions (AGENTS.md, CLAUDE.md, .claude/commands, .codex, .mcp.json,
-# boost.json) are committed; only local agent state is ignored.
+# boost.json) and the Boost skills (.claude/skills, .agents/skills, regenerated
+# by `composer update`) are committed; only local agent state is ignored.
 /.claude/settings.local.json
-/.claude/skills

@@ -5,17 +5,17 @@ Suite layout and the per-feature coverage list are in
 
 ## Strategy
 
-| Layer                        | Location                                              | What to cover                                                                                           |
-| ---------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Handler (via endpoint)       | `tests/Feature/{Aggregate}/Features/{Action}Test.php` | Success result and database state, validation, 401/redirect, 404 for other owners, no writes on failure |
-| Models, enums, `Common/`     | `tests/Unit/{Aggregate}/Models/`, `Common/`           | Pure behavior without the application booted                                                            |
-| Aggregate user flows         | `tests/Browser/{Aggregate}/`                          | Real Chromium flows; finish with `assertNoJavaScriptErrors()`                                           |
-| Starter-kit user flows       | `tests/Browser/`                                      | Sign in, app shell                                                                                      |
-| Inertia pages outside `src/` | `tests/Feature/`                                      | Access rules and `assertInertia` component and props                                                    |
-| `app/Support`, shared traits | `tests/Unit/`                                         | Pure behavior without the application booted                                                            |
-| Documentation rules          | `tests/Unit/Docs/AsyncApiScopeTest.php`               | AsyncAPI documents domain events only (see below)                                                       |
-| Infrastructure               | `tests/Feature/InfrastructureTest.php`                | The suite uses PostgreSQL, Redis, RabbitMQ, and Mailpit                                                 |
-| Octane request isolation     | `tests/Feature/OctaneRequestIsolationTest.php`        | Users and inputs do not leak between requests on one worker                                             |
+| Layer                        | Location                                              | What to cover                                                                                                                    |
+| ---------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Handler (via endpoint)       | `tests/Feature/{Aggregate}/Features/{Action}Test.php` | Success result and database state, validation, 401/redirect, 404 for other owners, no writes on failure                          |
+| Models, enums, `Common/`     | `tests/Unit/{Aggregate}/Models/`, `Common/`           | Pure behavior without the application booted                                                                                     |
+| Aggregate user flows         | `tests/Browser/{Aggregate}/`                          | Real Chromium flows; finish with `assertNoJavaScriptErrors()`                                                                    |
+| Starter-kit user flows       | `tests/Browser/`                                      | Sign in, password reset, email verification, two-factor challenge, password confirmation and change, account deletion, app shell |
+| Inertia pages outside `src/` | `tests/Feature/`                                      | Access rules and `assertInertia` component and props                                                                             |
+| `app/Support`, shared traits | `tests/Unit/`                                         | Pure behavior without the application booted                                                                                     |
+| Documentation rules          | `tests/Unit/Docs/AsyncApiScopeTest.php`               | AsyncAPI documents domain events only (see below)                                                                                |
+| Infrastructure               | `tests/Feature/InfrastructureTest.php`                | The suite uses PostgreSQL, Redis, RabbitMQ, and Mailpit                                                                          |
+| Octane request isolation     | `tests/Feature/OctaneRequestIsolationTest.php`        | Users and inputs do not leak between requests on one worker                                                                      |
 
 - Test Handlers through their endpoints, so routing, middleware, validation,
   and authorization run as in production.
@@ -27,20 +27,13 @@ Suite layout and the per-feature coverage list are in
 ## Documentation tests
 
 `tests/Unit/Docs/AsyncApiScopeTest.php` enforces the
-[AsyncAPI scope](../AGENTS.md#asyncapi-scope): every channel address in
-`resources/docs/api/*.asyncapi.yaml` must be a class implementing
-`App\Support\DomainEvent`, and every `DomainEvent` class under `src/` must be
-documented. When it fails, fix the spec or the event, never the test.
+[AsyncAPI scope](../AGENTS.md#asyncapi-scope), where its checks are listed.
+When it fails, fix the spec or the event, never the test.
 
 ## Browser tests
 
-- Browser tests live in `tests/Browser/` (starter-kit flows at the top level,
-  aggregate flows in `tests/Browser/{Aggregate}/`). They use the Pest browser
-  plugin with the Chromium that Playwright installed in the app container
-  (`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`).
-- Open pages with `visit(route(...))`, select elements with `@data-test`
-  attributes, and end every test with `assertNoJavaScriptErrors()`.
-- Failure screenshots land in `tests/Browser/Screenshots`, which Git ignores.
+The rules for writing browser tests are in
+[tests/AGENTS.md](../../../tests/AGENTS.md#browser-tests).
 
 ## Frontend unit tests
 
@@ -59,13 +52,25 @@ Compose services:
 - PostgreSQL: `DB_CONNECTION=pgsql` with `DB_DATABASE=testing`, a separate
   database created by `etc/docker/postgres/create-testing-database.sh` and
   `etc/bin/dev.sh`.
-- Redis for cache and sessions (databases 2 and 3, prefix `testing-`).
-- RabbitMQ for the queue, on the `testing` queue.
-- Mailpit over SMTP.
+- Redis for cache and sessions (databases 2 and 3, prefix `testing-`). Both
+  databases are flushed before each test that boots the application
+  (`tests/TestCase.php`).
+- RabbitMQ for the queue, on the `testing` queue, which `tests/TestCase.php`
+  purges once per run; `InfrastructureTest` sends a real job through it and
+  runs `queue:work --once`. Tests share RabbitMQ's `/` vhost with development,
+  so never dispatch test jobs onto another queue name.
+- Mailpit over SMTP. `tests/Support/Mailpit.php` reads its messages over the
+  HTTP API, so tests follow the real reset and verification links.
 
 Host names and credentials come from `.env`, so the same `phpunit.xml` works
 in the `app` container and in CI. `RefreshDatabase` resets only `testing`; the
 development database is never touched.
+
+A cached configuration must never point the tests at the development
+services. `phpunit.xml` forces `APP_CONFIG_CACHE`, `APP_ROUTES_CACHE`, and
+`APP_EVENTS_CACHE` to paths nothing writes, and forces `REDIS_URL` empty so it
+cannot override the Redis database above. `tests/TestCase.php` refuses to run
+unless the connection really is the `testing` database and Redis DB 2.
 
 CI (`.github/workflows/tests.yml`) starts the Compose stack and runs
 `composer ci:check` on `master` and on pull requests.

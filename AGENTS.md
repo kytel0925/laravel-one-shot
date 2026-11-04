@@ -12,18 +12,18 @@ Package managers: Composer and npm (`package-lock.json`; restore with `npm ci`).
 Every command except the first runs inside the `app` container: prefix it with
 `docker compose exec app` (add `-T` when there is no terminal).
 
-| Task                        | Command                                                        |
-| --------------------------- | -------------------------------------------------------------- |
-| Start the environment       | `cp .env.example .env && docker compose up -d` (from the host) |
-| Format PHP after edits      | `vendor/bin/pint --dirty --format agent`                       |
-| PHP tests                   | `php artisan test --compact [path]`                            |
-| Browser tests               | `php artisan test --compact --testsuite=Browser`               |
-| Static analysis (Larastan)  | `composer types:check`                                         |
-| Frontend lint and format    | `npm run check`                                                |
-| Frontend types              | `npm run types:check`                                          |
-| Frontend unit tests         | `npm run test`                                                 |
-| Build and regenerate routes | `npm run build`                                                |
-| Full CI checks (ask first)  | `composer ci:check`                                            |
+| Task                        | Command                                                           |
+| --------------------------- | ----------------------------------------------------------------- |
+| Start the environment       | `cp -n .env.example .env && docker compose up -d` (from the host) |
+| Format PHP after edits      | `vendor/bin/pint --dirty --format agent`                          |
+| PHP tests                   | `php artisan test --compact [path]`                               |
+| Browser tests               | `php artisan test --compact --testsuite=Browser`                  |
+| Static analysis (Larastan)  | `composer types:check`                                            |
+| Frontend lint and format    | `npm run check`                                                   |
+| Frontend types              | `npm run types:check`                                             |
+| Frontend unit tests         | `npm run test`                                                    |
+| Build and regenerate routes | `npm run build`                                                   |
+| Full CI checks (ask first)  | `composer ci:check`                                               |
 
 ## Every task
 

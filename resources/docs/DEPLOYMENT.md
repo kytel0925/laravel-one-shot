@@ -7,7 +7,7 @@ development and tests, the CI workflow, and the production image. Everything bel
 
 ## Development and test topology (`docker-compose.yml`)
 
-`cp .env.example .env && docker compose up -d` starts five services. Compose reads `.env` for the
+`cp -n .env.example .env && docker compose up -d` starts five services. Compose reads `.env` for the
 `${...}` values; every variable has a default equal to `.env.example`, so the stack also starts before
 `.env` exists.
 
@@ -134,8 +134,8 @@ Steps:
    five services as development, waiting for the health checks.
 4. `docker compose exec -T app npm run build`: builds the front-end assets.
 5. `docker compose exec -T app composer ci:check`: `npm run check` (`vp check`), `npm run types:check`
-   (`vue-tsc`), then `composer test` (clears the config cache, Pint in test mode, Larastan/PHPStan,
-   `php artisan test` for the Unit, Feature and Browser suites).
+   (`vue-tsc`), `npm run test` (frontend unit tests), then `composer test` (clears the config cache, Pint in
+   test mode, Larastan/PHPStan, `php artisan test` for the Unit, Feature and Browser suites).
 6. On failure only: prints the last 300 log lines per container and uploads
    `tests/Browser/Screenshots` as the `browser-screenshots` artifact.
 

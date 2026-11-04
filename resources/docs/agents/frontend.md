@@ -7,20 +7,15 @@ Directory layout and file placement are in
 
 - The Inertia component name is the page path under `resources/js/pages/`
   without `.vue` (`auth/Login`, `settings/Profile`).
-- `resources/js/app.ts` picks layouts by page name: `Welcome` renders in
-  `AppRoot` only, `auth/*` in `[AppRoot, AuthLayout]`, `settings/*` in
-  `[AppRoot, AppLayout, SettingsLayout]`, and everything else in
-  `[AppRoot, AppLayout]`. Pages pass layout props with
-  `defineOptions({ layout: {...} })`.
-- `AuthLayout` takes `title`, `description`, optional `icon` (`mdi-*`),
-  `switchLink` and `footer` (`AuthLink` from `types/auth.ts`:
-  `{ text?, label, href }`), and `back` (defaults to home). Its slot holds
-  tonal alerts first and a full-width primary button last.
+- Layout selection by page name and the `AuthLayout` props are in
+  [resources/js/AGENTS.md](../../../resources/js/AGENTS.md).
 - `components/AppRoot.vue` provides the single `<v-app>` and the
   `<v-snackbar-queue>` that shows flash toasts (`lib/flashToast.ts`, sent by
-  the server with `Inertia::flash('toast', ...)`).
-- Shared Inertia props are typed in `resources/js/types/global.d.ts`, which
-  must match `HandleInertiaRequests::share()`.
+  the server with `Inertia::flash('toast', ...)`). The snackbar is the MD3
+  inverse surface with an inverse-primary action and a leading icon per toast
+  type (`success`, `info`, `warning`, `error`).
+- Shared Inertia props are typed in `resources/js/types/global.d.ts` (see
+  [resources/js/AGENTS.md](../../../resources/js/AGENTS.md)).
 
 ## Backend calls
 
@@ -54,8 +49,9 @@ Directory layout and file placement are in
 - Build new UI from Vuetify components with theme colors and `mdi-*` icons:
   `<v-btn color="primary">`, `<v-icon icon="mdi-check" />`.
 - Theme tokens live in `resources/js/lib/theme.ts`: the Material Design 3
-  baseline color roles of the `light` and `dark` themes. The themes keep these
-  names so Vuetify's `system` theme works. Change colors there only.
+  baseline color roles of the `light` and `dark` themes, including the
+  `on-surface-container-*` roles. The themes keep these names so Vuetify's
+  `system` theme works. Change colors there only.
   Components use theme colors (`color="primary-container"`,
   `rgb(var(--v-theme-surface-container))`), never raw hex values.
 - Text uses MD3 role classes or the components' defaults:
@@ -76,7 +72,9 @@ Directory layout and file placement are in
   `useDisplay()` flashes the wrong layout on server-rendered pages.
 - A region on a theme surface uses its `bg-<token>` class (`bg-surface`,
   `bg-background`), which also sets the paired `on-<token>` text color; keep
-  text on it at 4.5:1 contrast in both themes.
+  text on it at 4.5:1 contrast in both themes. Supporting text uses
+  `text-medium-emphasis`, whose opacity `lib/theme.ts` raises to 0.72 (theme
+  `variables`) so it stays above 4.5:1; do not lower it.
 - Light and dark themes follow the appearance setting through
   `composables/useAppearance.ts` and the `HandleAppearance` middleware. The
   `appearance` cookie is the single source of truth. Change theme behavior
@@ -93,24 +91,29 @@ Directory layout and file placement are in
   and `viewport` cookies (unencrypted; see `bootstrap/app.php`).
   `HandleInertiaRequests` shares `appearance`, `systemTheme`, and `viewport`;
   `app.ts` passes `viewport` to Vuetify's `ssr` option and the rendered theme,
-  and `AppRoot` switches to the real appearance after mount. Keep
-  `types/global.d.ts` in sync with `HandleInertiaRequests::share()`.
+  and `AppRoot` switches to the real appearance after mount.
 
 ## App shell
 
 - `layouts/AppLayout.vue` is the signed-in shell. It swaps at md (960) with
   `useDisplay().mdAndUp`, so it changes on resize without a reload: from md up
-  the permanent `AppDrawer` (its rail toggle is stored in the `sidebar_state`
-  cookie and arrives as the `sidebarOpen` prop) and `AppTopBar` (breadcrumbs
-  and user menu); below md `AppMobileBar` and `AppBottomNav`. The shell wraps
-  the page in the one `.page-container py-6`. The user avatar and menu read
+  the permanent `AppDrawer` (the rail toggle in `AppTopBar` collapses it to a
+  rail that hides the labels; the state is stored in the `sidebar_state`
+  cookie and arrives as the `sidebarOpen` prop) and `AppTopBar` (rail toggle,
+  breadcrumbs, and user menu); below md `AppMobileBar` with a nav icon
+  (`data-test="mobile-drawer-toggle"`) that opens the same `AppDrawer` as a
+  modal drawer (its `modal` prop). There is no bottom navigation bar: MD3
+  asks for 3 to 5 destinations and the template has two. The shell wraps the
+  page in the one `.page-container py-6`. The user avatar and menu read
   `auth.user`.
 - Shared components live in `components/`: the shell (`AppRoot`, `AppDrawer`,
-  `AppTopBar`, `AppMobileBar`, `AppBottomNav`, `AppBreadcrumbs`, `AppLogo`,
+  `AppTopBar`, `AppMobileBar`, `AppBreadcrumbs`, `AppLogo`,
   `AppLogoIcon`, `UserMenu`, `UserAvatar`), page building blocks
-  (`PageHeading`, `SettingsSection`, `PasswordField`, `TextLink`), and the
-  two-factor, passkey, appearance, and delete-account components. Check them
-  before writing a new one.
+  (`PageHeading`, `SettingsSection` with an `h2` title, `PasswordField` with a
+  real icon button in the `append-inner` slot that sets `aria-label` and
+  `aria-pressed`, `TextLink`), and the
+  two-factor, passkey, appearance, and delete-account components. Dialogs set
+  `aria-labelledby` to their title. Check them before writing a new one.
 - Destinations live in `composables/useAppNavigation.ts`. An item with
   `href: null` has no feature yet and renders disabled, with no `href`.
 - Vuetify sets `aria-current` only for vue-router links, so the shell binds

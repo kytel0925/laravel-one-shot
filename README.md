@@ -8,7 +8,7 @@ RabbitMQ and Mailpit run in Docker Compose.
 ## Quick start
 
 ```bash
-cp .env.example .env && docker compose up -d
+cp -n .env.example .env && docker compose up -d
 ```
 
 The first start installs Composer and npm dependencies, generates `APP_KEY`,

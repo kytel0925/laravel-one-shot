@@ -15,7 +15,7 @@ checkout to run with no manual setup.
 
 Docker Compose is the one supported development and test environment (`docker-compose.yml`):
 
-- Start with `cp .env.example .env && docker compose up -d`. Every `${...}` variable has a default equal to
+- Start with `cp -n .env.example .env && docker compose up -d`. Every `${...}` variable has a default equal to
   `.env.example`, so the stack also starts before `.env` exists.
 - Services: `app` (build of `Dockerfile.dev`: PHP 8.5 on FrankenPHP, Composer, Node 24, Playwright's
   Chromium), `postgres:18-alpine`, `redis:8-alpine`, `rabbitmq:4-management-alpine` and

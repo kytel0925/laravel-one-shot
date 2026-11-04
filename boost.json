@@ -3,6 +3,17 @@
         "claude_code",
         "codex"
     ],
+    "cloud": true,
     "guidelines": true,
-    "mcp": true
+    "mcp": true,
+    "skills": [
+        "infer-conventions",
+        "deploying-to-cloud",
+        "fortify-development",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "octane-development",
+        "wayfinder-development",
+        "inertia-vue-development"
+    ]
 }

@@ -8,7 +8,7 @@ info:
         Pages are Inertia components: a browser visit returns the HTML shell, an
         Inertia XHR (`X-Inertia: true`) returns the page object JSON.
         Shared props from `HandleInertiaRequests::share()` (name, auth.user, sidebarOpen,
-        appearance, systemTheme, viewport, plus errors and flash) are on every page;
+        appearance, systemTheme, viewport, plus errors) are on every page;
         the components below list only the page-specific props (none for these pages).
 servers:
     - url: http://localhost:8000
@@ -42,7 +42,6 @@ paths:
                         systemTheme,
                         viewport,
                         errors,
-                        flash,
                     ]
             responses:
                 '200':
@@ -74,7 +73,6 @@ paths:
                         systemTheme,
                         viewport,
                         errors,
-                        flash,
                     ]
             responses:
                 '200':
@@ -145,6 +143,23 @@ components:
                     type: string
                 props:
                     $ref: '#/components/schemas/InertiaSharedProps'
+                flash:
+                    type: object
+                    description: >-
+                        One-time data, sent by Inertia 3 as a top-level key next to `props` (not a
+                        shared prop) and only on the response that carries it. Controllers flash
+                        `toast` = {type, message}.
+                    properties:
+                        toast:
+                            type: object
+                            required: [type, message]
+                            properties:
+                                type:
+                                    type: string
+                                    enum: [success, info, warning, error]
+                                message:
+                                    type: string
+                    additionalProperties: true
                 url:
                     type: string
                 version:
@@ -173,7 +188,7 @@ components:
             type: object
             description: >-
                 Props shared with every Inertia page by `HandleInertiaRequests::share()`
-                (plus Inertia's own `errors` and `flash`).
+                (plus Inertia's own `errors`).
             required:
                 [name, auth, sidebarOpen, appearance, systemTheme, viewport]
             properties:
@@ -215,11 +230,6 @@ components:
                     description: Validation errors of the previous request, keyed by field.
                     additionalProperties:
                         type: string
-                flash:
-                    type: object
-                    description: >-
-                        One-time data. Settings controllers flash `toast` = {type, message}.
-                    additionalProperties: true
         User:
             type: object
             description: >-
