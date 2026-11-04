@@ -31,6 +31,12 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <!-- A cached config/routes/events file would ignore every value below
+             and send tests to the development services: point the caches at
+             paths nothing writes. -->
+        <env name="APP_CONFIG_CACHE" value="bootstrap/cache/testing-config.php" force="true"/>
+        <env name="APP_ROUTES_CACHE" value="bootstrap/cache/testing-routes.php" force="true"/>
+        <env name="APP_EVENTS_CACHE" value="bootstrap/cache/testing-events.php" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="DB_CONNECTION" value="pgsql" force="true"/>
@@ -41,6 +47,7 @@
         <env name="REDIS_DB" value="2" force="true"/>
         <env name="REDIS_CACHE_DB" value="3" force="true"/>
         <env name="REDIS_PREFIX" value="testing-" force="true"/>
+        <env name="REDIS_URL" value="" force="true"/>
         <env name="QUEUE_CONNECTION" value="rabbitmq" force="true"/>
         <env name="RABBITMQ_QUEUE" value="testing" force="true"/>
         <env name="MAIL_MAILER" value="smtp" force="true"/>

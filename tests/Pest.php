@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\ExpectationFailedException;
 use Tests\TestCase;
 
 /*
@@ -29,3 +30,30 @@ pest()->extend(TestCase::class)
 */
 
 pest()->browser()->timeout(10_000);
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Waits up to five seconds for text to become visible. Pest's assertSee()
+ * (and waitForText()) check once, but an Inertia form submit updates the
+ * page over XHR without a navigation to wait for. The page's wait() keeps
+ * the in-process server answering requests, unlike sleep().
+ */
+function seeEventually(mixed $page, string $text): mixed
+{
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            return $page->assertSee($text);
+        } catch (ExpectationFailedException $exception) {
+            if ($attempt === 20) {
+                throw $exception;
+            }
+
+            $page->wait(0.25);
+        }
+    }
+}

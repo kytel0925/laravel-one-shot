@@ -3,12 +3,15 @@
 use Illuminate\Cache\RedisStore;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Session\CacheBasedSessionHandler;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
+use Tests\Fixtures\Jobs\RecordProcessedJob;
 use VladimirYuldashev\LaravelQueueRabbitMQ\Queue\RabbitMQQueue;
 
 /*
@@ -22,21 +25,31 @@ test('the database is the testing PostgreSQL database', function () {
         ->and(DB::scalar('select version()'))->toStartWith('PostgreSQL');
 });
 
-test('the cache store is Redis', function () {
+test('the cache store is Redis database 3 with the testing prefix', function () {
     $key = 'infrastructure-'.Str::random();
 
     Cache::put($key, 'ok', 10);
 
+    $redis = Redis::connection('cache');
+
     expect(config('cache.default'))->toBe('redis')
         ->and(Cache::getStore())->toBeInstanceOf(RedisStore::class)
-        ->and(Cache::get($key))->toBe('ok');
-
-    Cache::forget($key);
+        ->and(Cache::get($key))->toBe('ok')
+        ->and((string) $redis->client()->getDbNum())->toBe('3')
+        ->and($redis->client()->keys('*'.$key))->not->toBeEmpty()
+        ->and(config('database.redis.options.prefix'))->toBe('testing-');
 });
 
-test('sessions are stored in Redis', function () {
+test('sessions are stored in Redis database 2', function () {
+    $this->get(route('login'))->assertOk();
+
+    $handler = session()->getHandler();
+
     expect(config('session.driver'))->toBe('redis')
-        ->and(session()->getHandler())->toBeInstanceOf(CacheBasedSessionHandler::class);
+        ->and($handler)->toBeInstanceOf(CacheBasedSessionHandler::class)
+        ->and($handler->getCache()->getStore())->toBeInstanceOf(RedisStore::class)
+        ->and((string) Redis::connection('default')->client()->getDbNum())->toBe('2')
+        ->and(Redis::connection('default')->client()->keys('*'))->not->toBeEmpty();
 });
 
 test('the queue connection is RabbitMQ and round-trips a message', function () {
@@ -58,6 +71,22 @@ test('the queue connection is RabbitMQ and round-trips a message', function () {
     } finally {
         $queue->deleteQueue($name);
     }
+});
+
+test('a queued job travels through the RabbitMQ testing queue', function () {
+    $marker = Str::random(12);
+
+    expect(config('queue.connections.rabbitmq.queue'))->toBe('testing');
+
+    dispatch(new RecordProcessedJob($marker));
+
+    expect(Queue::connection()->size('testing'))->toBe(1)
+        ->and(Cache::has('processed-'.$marker))->toBeFalse();
+
+    Artisan::call('queue:work', ['--once' => true, '--queue' => 'testing', '--stop-when-empty' => true]);
+
+    expect(Cache::get('processed-'.$marker))->toBeTrue()
+        ->and(Queue::connection()->size('testing'))->toBe(0);
 });
 
 test('mail is delivered to Mailpit over SMTP', function () {

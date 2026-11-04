@@ -1,15 +1,15 @@
 asyncapi: 3.0.0
 info:
-  title: Fixture with a domain event
-  version: 1.0.0
+    title: Fixture with a domain event
+    version: 1.0.0
 channels:
-  taskCompleted:
-    address: Tests\Fixtures\AsyncApi\TaskCompleted
-    messages:
-      taskCompleted:
-        payload:
-          type: object
-          properties:
-            taskUuid:
-              type: string
-              format: uuid
+    taskCompleted:
+        address: Tests\Fixtures\AsyncApi\Events\TaskCompleted
+        messages:
+            taskCompleted:
+                payload:
+                    type: object
+                    properties:
+                        taskUuid:
+                            type: string
+                            format: uuid

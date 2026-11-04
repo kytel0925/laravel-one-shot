@@ -1,13 +1,13 @@
 asyncapi: 3.0.0
 info:
-  title: Fixture with framework events (must be rejected)
-  version: 1.0.0
+    title: Fixture with framework events (must be rejected)
+    version: 1.0.0
 channels:
-  registered:
-    address: Illuminate\Auth\Events\Registered
-  jobProcessed:
-    address: Illuminate\Queue\Events\JobProcessed
-  login:
-    address: Laravel\Fortify\Events\TwoFactorAuthenticationEnabled
-  notADomainEvent:
-    address: App\Models\User
+    registered:
+        address: Illuminate\Auth\Events\Registered
+    jobProcessed:
+        address: Illuminate\Queue\Events\JobProcessed
+    login:
+        address: Laravel\Fortify\Events\TwoFactorAuthenticationEnabled
+    notADomainEvent:
+        address: App\Models\User
