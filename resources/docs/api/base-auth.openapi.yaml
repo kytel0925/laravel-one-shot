@@ -1,0 +1,1388 @@
+openapi: 3.1.0
+info:
+    title: Base auth
+    version: 1.0.0
+    description: >-
+        Authentication routes registered by Laravel Fortify (config/fortify.php, prefix empty, middleware
+        `web`) and Laravel Passkeys. Enabled Fortify features: registration, resetPasswords,
+        emailVerification, twoFactorAuthentication (`confirm: true`, `confirmPassword: true`) and
+        passkeys (`confirmPassword: true`). Views are Inertia components rendered by
+        App\Providers\FortifyServiceProvider.
+
+        Response conventions (Fortify): requests that do not ask for JSON (browsers and Inertia XHR)
+        get redirects with `status` flashed to the session; requests with `Accept: application/json` get
+        the JSON bodies documented per operation. Validation failures are 422 for JSON and a redirect back
+        with `errors` otherwise. Inertia turns 302 into 303 for PUT, PATCH and DELETE.
+
+        Shared Inertia props (`HandleInertiaRequests::share()`: name, auth.user, sidebarOpen, appearance,
+        systemTheme, viewport, plus errors) are on every page and are not repeated per operation.
+
+        Rate limiters (App\Providers\FortifyServiceProvider): `login` 5 per minute per lowercased
+        email and IP; `two-factor` 5 per minute per `login.id` session value; `passkeys` 10 per minute per
+        `credential.id` (or session id) and IP. `throttle:6,1` is 6 per minute.
+
+        Known deviations from the "no ids in routes" rule, both imposed by the packages and not
+        configurable: `/email/verify/{id}/{hash}` carries `User.id` (Fortify compares it with the model
+        key), and `/user/passkeys/{passkey}` carries the id of the passkey record (ownership is enforced
+        with 403). Never copy either pattern into new routes.
+servers:
+    - url: http://localhost:8000
+security:
+    - session: []
+      csrf: []
+tags:
+    - name: login
+    - name: registration
+    - name: password-reset
+    - name: email-verification
+    - name: password-confirmation
+    - name: two-factor
+    - name: passkeys
+paths:
+    /login:
+        get:
+            operationId: showLogin
+            summary: Login page
+            tags: [login]
+            security: []
+            x-route-name: login
+            x-middleware: ['guest:web']
+            x-inertia-component: auth/Login
+            x-inertia-props:
+                page: [canResetPassword, status]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: >-
+                        Inertia page `auth/Login`. `canResetPassword` is true when the resetPasswords feature is enabled;
+                        `status` is the flashed session status, if any.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/AlreadyAuthenticated'
+        post:
+            operationId: login
+            summary: Log in with email and password
+            description: >-
+                Fortify pipeline: canonicalize the username (lowercase), redirect to the two-factor challenge when
+                the user has confirmed two-factor authentication, authenticate, regenerate the session.
+            tags: [login]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: login.store
+            x-middleware: ['guest:web', 'throttle:login']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginRequest'
+            responses:
+                '200':
+                    description: JSON requests only.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [two_factor]
+                                properties:
+                                    two_factor:
+                                        type: boolean
+                                        description: True when a two-factor challenge is pending (`/two-factor-challenge`).
+                '302':
+                    description: >-
+                        Logged in: redirect to the intended URL or `/dashboard`. When two-factor authentication is
+                        confirmed for the user, redirect to `/two-factor-challenge` and store `login.id` and
+                        `login.remember` in the session. Failed credentials also redirect back to `/login` with an
+                        `email` error (`These credentials do not match our records.`).
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /logout:
+        post:
+            operationId: logout
+            summary: Log out
+            description: Logs the user out, invalidates the session and regenerates the CSRF token.
+            tags: [login]
+            x-route-name: logout
+            x-middleware: ['auth:web']
+            responses:
+                '204':
+                    description: JSON requests only.
+                '302':
+                    description: Redirect to `/`. Also returned for guests, who are redirected to `/login` by `auth:web`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+    /register:
+        get:
+            operationId: showRegister
+            summary: Registration page
+            tags: [registration]
+            security: []
+            x-route-name: register
+            x-middleware: ['guest:web']
+            x-inertia-component: auth/Register
+            x-inertia-props:
+                page: [passwordRules]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: >-
+                        Inertia page `auth/Register`. `passwordRules` is `Password::defaults()->toPasswordRulesString()`
+                        (the HTML `passwordrules` hint).
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/AlreadyAuthenticated'
+        post:
+            operationId: register
+            summary: Create an account
+            description: >-
+                App\Actions\Fortify\CreateNewUser validates the input, creates the user and Fortify logs the user in
+                and sends the email verification notification.
+            tags: [registration]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: register.store
+            x-middleware: ['guest:web']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/RegisterRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RegisterRequest'
+            responses:
+                '201':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: Redirect to the intended URL or `/dashboard`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+    /forgot-password:
+        get:
+            operationId: showForgotPassword
+            summary: Forgot password page
+            tags: [password-reset]
+            security: []
+            x-route-name: password.request
+            x-middleware: ['guest:web']
+            x-inertia-component: auth/ForgotPassword
+            x-inertia-props:
+                page: [status]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: Inertia page `auth/ForgotPassword`; `status` is the flashed session status, if any.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/AlreadyAuthenticated'
+        post:
+            operationId: sendPasswordResetLink
+            summary: Email a password reset link
+            description: >-
+                Uses the `users` password broker. The route has no throttle middleware; the broker itself
+                refuses repeated requests inside its throttle window with an `email` error.
+            tags: [password-reset]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: password.email
+            x-middleware: ['guest:web']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ForgotPasswordRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ForgotPasswordRequest'
+            responses:
+                '200':
+                    description: JSON requests only.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageResponse'
+                '302':
+                    description: >-
+                        Redirect back with the flashed `status` (`We have emailed your password reset link.`), or with an
+                        `email` error when the broker refuses (unknown user, throttled).
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+    /reset-password/{token}:
+        get:
+            operationId: showResetPassword
+            summary: Reset password page
+            description: Target of the link in the reset email (`?email=` carries the address).
+            tags: [password-reset]
+            security: []
+            x-route-name: password.reset
+            x-middleware: ['guest:web']
+            x-inertia-component: auth/ResetPassword
+            x-inertia-props:
+                page: [email, token, passwordRules]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            parameters:
+                - name: token
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: email
+                  in: query
+                  required: false
+                  schema:
+                      type: string
+                      format: email
+            responses:
+                '200':
+                    description: >-
+                        Inertia page `auth/ResetPassword` with props `email` (the `email` query value), `token` and
+                        `passwordRules`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/AlreadyAuthenticated'
+    /reset-password:
+        post:
+            operationId: resetPassword
+            summary: Set a new password
+            description: >-
+                The broker validates the token, then App\Actions\Fortify\ResetUserPassword validates the password
+                and saves it. No throttle middleware.
+            tags: [password-reset]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: password.update
+            x-middleware: ['guest:web']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ResetPasswordRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ResetPasswordRequest'
+            responses:
+                '200':
+                    description: JSON requests only.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MessageResponse'
+                '302':
+                    description: >-
+                        Redirect to `/login` with the flashed `status` (`Your password has been reset.`). An invalid or
+                        expired token redirects back with an `email` error.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+    /email/verify:
+        get:
+            operationId: showEmailVerificationNotice
+            summary: Email verification notice page
+            tags: [email-verification]
+            x-route-name: verification.notice
+            x-middleware: ['auth:web']
+            x-inertia-component: auth/VerifyEmail
+            x-inertia-props:
+                page: [status]
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: >-
+                        Inertia page `auth/VerifyEmail`; `status` is `verification-link-sent` after a resend.
+                        Users who already verified are redirected to `/dashboard`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+    /email/verify/{id}/{hash}:
+        get:
+            operationId: verifyEmail
+            summary: Verify the email address
+            description: >-
+                Signed link sent by the verification notification. Known deviation from the "no ids in routes" rule:
+                `{id}` is `User.id`; Fortify's VerifyEmailRequest compares it with the authenticated user's key and
+                offers no configuration for this. `{hash}` is the sha1 of the email address. The route needs a valid
+                signature and the matching logged-in user. Never copy this pattern into new routes.
+            tags: [email-verification]
+            x-route-name: verification.verify
+            x-middleware: ['auth:web', signed, 'throttle:6,1']
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+                - name: hash
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+                - name: expires
+                  in: query
+                  required: true
+                  schema:
+                      type: integer
+                - name: signature
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: JSON requests only.
+                '302':
+                    description: >-
+                        Redirect to the intended URL or `/dashboard?verified=1`. Guests are redirected to `/login`
+                        (and back here after logging in).
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: Invalid or expired signature, or `id`/`hash` do not match the logged-in user.
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /email/verification-notification:
+        post:
+            operationId: sendEmailVerificationNotification
+            summary: Resend the verification email
+            tags: [email-verification]
+            x-route-name: verification.send
+            x-middleware: ['auth:web', 'throttle:6,1']
+            responses:
+                '202':
+                    description: JSON requests only; empty body.
+                '204':
+                    description: JSON requests only; the email is already verified.
+                '302':
+                    description: >-
+                        Redirect back with `status` = `verification-link-sent`; users who already verified are redirected
+                        to the intended URL or `/dashboard`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /user/confirm-password:
+        get:
+            operationId: showConfirmPassword
+            summary: Confirm password page
+            tags: [password-confirmation]
+            x-route-name: password.confirm
+            x-middleware: ['auth:web']
+            x-inertia-component: auth/ConfirmPassword
+            x-inertia-props:
+                page: []
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: Inertia page `auth/ConfirmPassword`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+        post:
+            operationId: confirmPassword
+            summary: Confirm the password
+            description: >-
+                Stores `auth.password_confirmed_at` in the session. Fortify does not run request validation here;
+                a missing or wrong password is rejected with the same `password` error.
+            tags: [password-confirmation]
+            x-route-name: password.confirm.store
+            x-middleware: ['auth:web']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ConfirmPasswordRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConfirmPasswordRequest'
+            responses:
+                '201':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: >-
+                        Redirect to the intended URL (the page that required confirmation) or `/dashboard`. A wrong password
+                        redirects back with the `password` error `The provided password was incorrect.`
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+    /user/confirmed-password-status:
+        get:
+            operationId: getConfirmedPasswordStatus
+            summary: Password confirmation status
+            tags: [password-confirmation]
+            x-route-name: password.confirmation
+            x-middleware: ['auth:web']
+            parameters:
+                - name: seconds
+                  in: query
+                  required: false
+                  description: Confirmation window in seconds; defaults to `auth.password_timeout` (900).
+                  schema:
+                      type: integer
+            responses:
+                '200':
+                    description: Whether the password was confirmed within the window.
+                    headers:
+                        X-Retry-After:
+                            description: Seconds since the confirmation; only present when `confirmed` is true.
+                            schema:
+                                type: integer
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [confirmed]
+                                properties:
+                                    confirmed:
+                                        type: boolean
+                '302':
+                    $ref: '#/components/responses/Unauthenticated'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+    /two-factor-challenge:
+        get:
+            operationId: showTwoFactorChallenge
+            summary: Two-factor challenge page
+            tags: [two-factor]
+            security: []
+            x-route-name: two-factor.login
+            x-middleware: ['guest:web']
+            x-inertia-component: auth/TwoFactorChallenge
+            x-inertia-props:
+                page: []
+                shared:
+                    [
+                        name,
+                        auth.user,
+                        sidebarOpen,
+                        appearance,
+                        systemTheme,
+                        viewport,
+                        errors,
+                    ]
+            responses:
+                '200':
+                    description: Inertia page `auth/TwoFactorChallenge`.
+                    content:
+                        text/html:
+                            schema:
+                                type: string
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/InertiaPage'
+                '302':
+                    description: >-
+                        Redirect to `/login` when no login is pending in the session (`login.id` missing); logged-in
+                        users are redirected to `/dashboard`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+        post:
+            operationId: submitTwoFactorChallenge
+            summary: Complete a login with a two-factor code
+            description: Send either `code` (TOTP) or `recovery_code`. A used recovery code is replaced.
+            tags: [two-factor]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: two-factor.login.store
+            x-middleware: ['guest:web', 'throttle:two-factor']
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/TwoFactorChallengeRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/TwoFactorChallengeRequest'
+            responses:
+                '204':
+                    description: JSON requests only.
+                '302':
+                    description: >-
+                        Logged in: redirect to the intended URL or `/dashboard`. An invalid code redirects back to
+                        `/two-factor-challenge` with a `code` or `recovery_code` error.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /user/two-factor-authentication:
+        post:
+            operationId: enableTwoFactorAuthentication
+            summary: Enable two-factor authentication
+            description: >-
+                Generates the (encrypted) secret and 8 recovery codes unless a secret exists. Because `confirm` is
+                true, the factor is not active until `confirmTwoFactorAuthentication` succeeds.
+            tags: [two-factor]
+            x-route-name: two-factor.enable
+            x-middleware: ['auth:web', password.confirm]
+            requestBody:
+                required: false
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/EnableTwoFactorRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EnableTwoFactorRequest'
+            responses:
+                '200':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: Redirect back with `status` = `two-factor-authentication-enabled`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+        delete:
+            operationId: disableTwoFactorAuthentication
+            summary: Disable two-factor authentication
+            tags: [two-factor]
+            x-route-name: two-factor.disable
+            x-middleware: ['auth:web', password.confirm]
+            responses:
+                '200':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: Redirect back with `status` = `two-factor-authentication-disabled`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /user/confirmed-two-factor-authentication:
+        post:
+            operationId: confirmTwoFactorAuthentication
+            summary: Confirm two-factor authentication
+            description: Verifies a TOTP code against the stored secret and sets `two_factor_confirmed_at`.
+            tags: [two-factor]
+            x-route-name: two-factor.confirm
+            x-middleware: ['auth:web', password.confirm]
+            requestBody:
+                required: true
+                content:
+                    application/x-www-form-urlencoded:
+                        schema:
+                            $ref: '#/components/schemas/ConfirmTwoFactorRequest'
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ConfirmTwoFactorRequest'
+            responses:
+                '200':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: >-
+                        Redirect back with `status` = `two-factor-authentication-confirmed`. A wrong code redirects back
+                        with a `code` error in the `confirmTwoFactorAuthentication` error bag.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /user/two-factor-qr-code:
+        get:
+            operationId: getTwoFactorQrCode
+            summary: Two-factor QR code
+            tags: [two-factor]
+            x-route-name: two-factor.qr-code
+            x-middleware: ['auth:web', password.confirm]
+            responses:
+                '200':
+                    description: The QR code, or an empty array when two-factor authentication is not enabled.
+                    content:
+                        application/json:
+                            schema:
+                                oneOf:
+                                    - type: object
+                                      required: [svg, url]
+                                      properties:
+                                          svg:
+                                              type: string
+                                              description: SVG markup of the QR code.
+                                          url:
+                                              type: string
+                                              description: The `otpauth://` URL.
+                                    - type: array
+                                      maxItems: 0
+                '302':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /user/two-factor-secret-key:
+        get:
+            operationId: getTwoFactorSecretKey
+            summary: Two-factor setup key
+            tags: [two-factor]
+            x-route-name: two-factor.secret-key
+            x-middleware: ['auth:web', password.confirm]
+            responses:
+                '200':
+                    description: The decrypted TOTP secret.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [secretKey]
+                                properties:
+                                    secretKey:
+                                        type: string
+                '302':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '404':
+                    description: Two-factor authentication has not been enabled.
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /user/two-factor-recovery-codes:
+        get:
+            operationId: listTwoFactorRecoveryCodes
+            summary: Two-factor recovery codes
+            tags: [two-factor]
+            x-route-name: two-factor.recovery-codes
+            x-middleware: ['auth:web', password.confirm]
+            responses:
+                '200':
+                    description: The recovery codes, or an empty array when two-factor authentication is not enabled.
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    type: string
+                '302':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+        post:
+            operationId: regenerateTwoFactorRecoveryCodes
+            summary: Regenerate the recovery codes
+            tags: [two-factor]
+            x-route-name: two-factor.regenerate-recovery-codes
+            x-middleware: ['auth:web', password.confirm]
+            responses:
+                '200':
+                    description: JSON requests only; empty body.
+                '302':
+                    description: Redirect back with `status` = `recovery-codes-generated`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+    /passkeys/login/options:
+        get:
+            operationId: getPasskeyLoginOptions
+            summary: WebAuthn assertion options for login
+            description: Stores the serialized options in the session key `passkey.verification_options`.
+            tags: [passkeys]
+            security: []
+            x-route-name: passkey.login-options
+            x-middleware: ['guest:web', 'throttle:passkeys']
+            responses:
+                '200':
+                    $ref: '#/components/responses/PasskeyOptions'
+                '302':
+                    $ref: '#/components/responses/AlreadyAuthenticated'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /passkeys/login:
+        post:
+            operationId: loginWithPasskey
+            summary: Log in with a passkey
+            description: >-
+                Verifies the credential against the options stored in the session, logs the user in and
+                regenerates the session.
+            tags: [passkeys]
+            security:
+                - session: []
+                  csrf: []
+            x-route-name: passkey.login
+            x-middleware: ['guest:web', 'throttle:passkeys']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PasskeyVerificationRequest'
+            responses:
+                '200':
+                    $ref: '#/components/responses/PasskeyRedirect'
+                '302':
+                    description: Non-JSON requests are redirected to the intended URL or `/`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /passkeys/confirm/options:
+        get:
+            operationId: getPasskeyConfirmOptions
+            summary: WebAuthn assertion options for password confirmation
+            tags: [passkeys]
+            x-route-name: passkey.confirm-options
+            x-middleware: ['auth:web', 'throttle:passkeys']
+            responses:
+                '200':
+                    $ref: '#/components/responses/PasskeyOptions'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /passkeys/confirm:
+        post:
+            operationId: confirmWithPasskey
+            summary: Confirm the password with a passkey
+            description: Marks the password as confirmed in the session after verifying the credential.
+            tags: [passkeys]
+            x-route-name: passkey.confirm
+            x-middleware: ['auth:web', 'throttle:passkeys']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PasskeyVerificationRequest'
+            responses:
+                '200':
+                    $ref: '#/components/responses/PasskeyRedirect'
+                '302':
+                    description: Non-JSON requests are redirected to the intended URL.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /user/passkeys/options:
+        get:
+            operationId: getPasskeyRegistrationOptions
+            summary: WebAuthn creation options for registering a passkey
+            description: Stores the serialized options in the session key `passkey.registration_options`.
+            tags: [passkeys]
+            x-route-name: passkey.registration-options
+            x-middleware: ['auth:web', password.confirm, 'throttle:passkeys']
+            responses:
+                '200':
+                    $ref: '#/components/responses/PasskeyOptions'
+                '302':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /user/passkeys:
+        post:
+            operationId: registerPasskey
+            summary: Register a passkey
+            tags: [passkeys]
+            x-route-name: passkey.store
+            x-middleware: ['auth:web', password.confirm, 'throttle:passkeys']
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PasskeyRegistrationRequest'
+            responses:
+                '200':
+                    description: JSON requests.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [status]
+                                properties:
+                                    status:
+                                        type: string
+                                        const: passkey-registered
+                                    id:
+                                        type: string
+                                    name:
+                                        type: string
+                '302':
+                    description: Non-JSON requests are redirected back with `status` = `passkey-registered`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '422':
+                    $ref: '#/components/responses/ValidationFailed'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+                '429':
+                    $ref: '#/components/responses/TooManyRequests'
+    /user/passkeys/{passkey}:
+        delete:
+            operationId: deletePasskey
+            summary: Delete a passkey
+            description: >-
+                `{passkey}` is the id of the passkey record (route model binding on Laravel\Passkeys\Passkey), not a
+                user id. Passkeys of other users answer 403. Known deviation from the "no ids in routes" rule; the
+                package defines the route. Never copy this pattern into new routes.
+            tags: [passkeys]
+            x-route-name: passkey.destroy
+            x-middleware: ['auth:web', password.confirm]
+            parameters:
+                - name: passkey
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                '200':
+                    description: JSON requests.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                required: [status]
+                                properties:
+                                    status:
+                                        type: string
+                                        const: passkey-deleted
+                '302':
+                    description: Non-JSON requests are redirected back with `status` = `passkey-deleted`.
+                    headers:
+                        Location:
+                            $ref: '#/components/headers/Location'
+                '401':
+                    $ref: '#/components/responses/Unauthenticated'
+                '403':
+                    description: The passkey belongs to another user.
+                '404':
+                    description: No such passkey.
+                '419':
+                    $ref: '#/components/responses/CsrfMismatch'
+                '423':
+                    $ref: '#/components/responses/PasswordConfirmationRequired'
+components:
+    securitySchemes:
+        session:
+            type: apiKey
+            in: cookie
+            name: laravel-session
+            description: >-
+                Laravel session cookie (SESSION_COOKIE, default `<app-name>-session`; the session is stored in Redis).
+                Users are identified only by this session; no user id appears in any route path
+                (the one framework deviation is documented on `verifyEmail` in base-auth).
+        csrf:
+            type: apiKey
+            in: header
+            name: X-XSRF-TOKEN
+            description: >-
+                CSRF token. Laravel sets the `XSRF-TOKEN` cookie; send its decoded value in the
+                `X-XSRF-TOKEN` header on every non-GET request. A missing or wrong token yields 419.
+    headers:
+        Location:
+            description: Target of the redirect.
+            schema:
+                type: string
+    schemas:
+        LoginRequest:
+            type: object
+            description: Fortify LoginRequest (`username` is `email` per config/fortify.php).
+            required: [email, password]
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                remember:
+                    type: boolean
+                    description: Rule `sometimes`; keeps the session via the remember cookie.
+        RegisterRequest:
+            type: object
+            description: >-
+                Rules from ProfileValidationRules and PasswordValidationRules (App\Actions\Fortify\CreateNewUser).
+                The password uses `Password::defaults()`: minimum 8 characters outside production; in production
+                minimum 12, mixed case, letters, numbers, symbols and not compromised.
+            required: [name, email, password, password_confirmation]
+            properties:
+                name:
+                    type: string
+                    maxLength: 255
+                email:
+                    type: string
+                    format: email
+                    maxLength: 255
+                    description: Must be unique in `users.email`; lowercased by Fortify.
+                password:
+                    type: string
+                    minLength: 8
+                password_confirmation:
+                    type: string
+                    description: Must equal `password` (rule `confirmed`).
+        ForgotPasswordRequest:
+            type: object
+            required: [email]
+            properties:
+                email:
+                    type: string
+                    format: email
+        ResetPasswordRequest:
+            type: object
+            description: >-
+                NewPasswordController requires `token`, `email` and `password`; ResetUserPassword then applies the
+                password rules (`required`, `string`, `Password::defaults()`, `confirmed`).
+            required: [token, email, password, password_confirmation]
+            properties:
+                token:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                password:
+                    type: string
+                    minLength: 8
+                password_confirmation:
+                    type: string
+        ConfirmPasswordRequest:
+            type: object
+            required: [password]
+            properties:
+                password:
+                    type: string
+        TwoFactorChallengeRequest:
+            type: object
+            description: Both fields are `nullable|string`; send exactly one.
+            properties:
+                code:
+                    type: [string, 'null']
+                    description: Six-digit TOTP code.
+                recovery_code:
+                    type: [string, 'null']
+        EnableTwoFactorRequest:
+            type: object
+            properties:
+                force:
+                    type: boolean
+                    default: false
+                    description: Regenerate the secret even if one exists.
+        ConfirmTwoFactorRequest:
+            type: object
+            required: [code]
+            properties:
+                code:
+                    type: string
+                    description: Six-digit TOTP code from the authenticator app.
+        PublicKeyCredential:
+            type: object
+            description: >-
+                The browser's PublicKeyCredential serialized to JSON (`@laravel/passkeys`). `response` holds the
+                attestation or assertion payload.
+            required: [id, rawId, type, response]
+            properties:
+                id:
+                    type: string
+                rawId:
+                    type: string
+                type:
+                    type: string
+                    const: public-key
+                response:
+                    type: object
+                    additionalProperties: true
+        PasskeyVerificationRequest:
+            type: object
+            required: [credential]
+            properties:
+                credential:
+                    $ref: '#/components/schemas/PublicKeyCredential'
+                remember:
+                    type: boolean
+        PasskeyRegistrationRequest:
+            type: object
+            required: [name, credential]
+            properties:
+                name:
+                    type: string
+                    maxLength: 255
+                credential:
+                    $ref: '#/components/schemas/PublicKeyCredential'
+        InertiaPage:
+            type: object
+            description: Inertia page object returned for Inertia XHR requests.
+            required: [component, props, url, version]
+            properties:
+                component:
+                    type: string
+                props:
+                    $ref: '#/components/schemas/InertiaSharedProps'
+                flash:
+                    type: object
+                    description: >-
+                        One-time data, sent by Inertia 3 as a top-level key next to `props` (not a
+                        shared prop) and only on the response that carries it. Controllers flash
+                        `toast` = {type, message}.
+                    properties:
+                        toast:
+                            type: object
+                            required: [type, message]
+                            properties:
+                                type:
+                                    type: string
+                                    enum: [success, info, warning, error]
+                                message:
+                                    type: string
+                    additionalProperties: true
+                url:
+                    type: string
+                version:
+                    type: [string, 'null']
+        ValidationError:
+            type: object
+            description: Laravel validation failure (JSON requests, status 422).
+            required: [message, errors]
+            properties:
+                message:
+                    type: string
+                    example: The given data was invalid.
+                errors:
+                    type: object
+                    additionalProperties:
+                        type: array
+                        items:
+                            type: string
+        MessageResponse:
+            type: object
+            required: [message]
+            properties:
+                message:
+                    type: string
+        InertiaSharedProps:
+            type: object
+            description: >-
+                Props shared with every Inertia page by `HandleInertiaRequests::share()`
+                (plus Inertia's own `errors`).
+            required:
+                [name, auth, sidebarOpen, appearance, systemTheme, viewport]
+            properties:
+                name:
+                    type: string
+                    description: config('app.name').
+                auth:
+                    type: object
+                    required: [user]
+                    properties:
+                        user:
+                            oneOf:
+                                - $ref: '#/components/schemas/User'
+                                - type: 'null'
+                sidebarOpen:
+                    type: boolean
+                    description: False only when the `sidebar_state` cookie is present and not `true`.
+                appearance:
+                    type: string
+                    enum: [light, dark, system]
+                    description: From the `appearance` cookie; `system` when absent or invalid.
+                systemTheme:
+                    type: string
+                    enum: [light, dark]
+                    description: From the `system_theme` cookie; `light` unless it is `dark`.
+                viewport:
+                    type: object
+                    required: [width, height]
+                    properties:
+                        width:
+                            type: integer
+                        height:
+                            type: integer
+                    description: >-
+                        Parsed from the `viewport` cookie (`<width>x<height>`, 2 to 5 digits each);
+                        defaults to 1280x800.
+                errors:
+                    type: object
+                    description: Validation errors of the previous request, keyed by field.
+                    additionalProperties:
+                        type: string
+        User:
+            type: object
+            description: >-
+                The authenticated user as serialized by the User model. Hidden attributes
+                (`password`, `two_factor_secret`, `two_factor_recovery_codes`, `remember_token`) are never sent.
+            required: [id, name, email]
+            properties:
+                id:
+                    type: integer
+                name:
+                    type: string
+                email:
+                    type: string
+                    format: email
+                email_verified_at:
+                    type: [string, 'null']
+                    format: date-time
+                two_factor_confirmed_at:
+                    type: [string, 'null']
+                    format: date-time
+                created_at:
+                    type: [string, 'null']
+                    format: date-time
+                updated_at:
+                    type: [string, 'null']
+                    format: date-time
+    responses:
+        PasskeyOptions:
+            description: WebAuthn options for `navigator.credentials` (Laravel\Passkeys WebAuthn::toBrowserArray).
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        required: [options]
+                        properties:
+                            options:
+                                type: object
+                                additionalProperties: true
+        PasskeyRedirect:
+            description: JSON requests; the client navigates to `redirect`.
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        required: [redirect]
+                        properties:
+                            redirect:
+                                type: string
+        Unauthenticated:
+            description: >-
+                Not logged in. HTML and Inertia requests get a 302 redirect to `/login`;
+                JSON requests (`Accept: application/json`) get 401.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Unauthenticated.
+        AlreadyAuthenticated:
+            description: Logged-in users are redirected to `/dashboard` by the `guest` middleware.
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        EmailNotVerified:
+            description: >-
+                The `verified` middleware redirects unverified users to `/email/verify`
+                (JSON requests get 403 `Your email address is not verified.`).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+        PasswordConfirmationRequired:
+            description: >-
+                The `password.confirm` middleware (RequirePassword). HTML and Inertia requests are redirected
+                to `/user/confirm-password`; JSON requests get 423. The confirmation lasts
+                `auth.password_timeout` seconds (900 by default).
+            headers:
+                Location:
+                    $ref: '#/components/headers/Location'
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/MessageResponse'
+                    example:
+                        message: Password confirmation required.
+        CsrfMismatch:
+            description: Missing or invalid CSRF token (page expired).
+        ValidationFailed:
+            description: >-
+                Validation failed. JSON requests get 422 with this body. HTML and Inertia
+                requests get a redirect back to the previous page with the errors flashed to the
+                session (exposed as the shared `errors` prop).
+            content:
+                application/json:
+                    schema:
+                        $ref: '#/components/schemas/ValidationError'
+        TooManyRequests:
+            description: Rate limit exceeded; the response carries `Retry-After`.
+            headers:
+                Retry-After:
+                    schema:
+                        type: integer

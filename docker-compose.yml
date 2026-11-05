@@ -1,0 +1,111 @@
+# Zero-config development and testing environment:
+#   cp .env.example .env && docker compose up -d
+# Compose reads .env for the ${...} values below; the defaults match
+# .env.example, so the stack also starts before .env exists.
+# Published ports listen on 127.0.0.1 only; set FORWARD_BIND_ADDRESS=0.0.0.0
+# to reach them from other machines.
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile.dev
+        # Runs as the host user so files written into the bind mount
+        # (vendor/, node_modules/, storage/) stay editable on the host.
+        user: '${APP_UID:-1000}:${APP_GID:-1000}'
+        init: true
+        working_dir: /app
+        volumes:
+            - .:/app
+        ports:
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000'
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${VITE_PORT:-5173}:5173'
+        environment:
+            VITE_HMR_HOST: '${VITE_HMR_HOST:-localhost}'
+            VITE_PORT: '${VITE_PORT:-5173}'
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            mailpit:
+                condition: service_started
+        healthcheck:
+            test: ['CMD', 'curl', '-fsS', 'http://localhost:8000/up']
+            interval: 10s
+            timeout: 5s
+            retries: 60
+            # The first start installs Composer and npm dependencies.
+            start_period: 600s
+            start_interval: 5s
+        restart: unless-stopped
+
+    postgres:
+        image: postgres:18-alpine
+        environment:
+            POSTGRES_DB: '${DB_DATABASE:-laravel}'
+            POSTGRES_USER: '${DB_USERNAME:-laravel}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
+            POSTGRES_TEST_DB: '${DB_TEST_DATABASE:-testing}'
+        ports:
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_DB_PORT:-5432}:5432'
+        volumes:
+            - postgres-data:/var/lib/postgresql
+            - ./etc/docker/postgres/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh:ro
+        healthcheck:
+            # TCP, not the socket: the init-time server listens on the socket only.
+            test:
+                [
+                    'CMD-SHELL',
+                    'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+        restart: unless-stopped
+
+    redis:
+        image: redis:8-alpine
+        command: ['redis-server', '--appendonly', 'yes']
+        ports:
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_REDIS_PORT:-6379}:6379'
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            timeout: 5s
+            retries: 20
+        restart: unless-stopped
+
+    rabbitmq:
+        image: rabbitmq:4-management-alpine
+        environment:
+            RABBITMQ_DEFAULT_USER: '${RABBITMQ_USER:-guest}'
+            RABBITMQ_DEFAULT_PASS: '${RABBITMQ_PASSWORD:-guest}'
+            RABBITMQ_DEFAULT_VHOST: '${RABBITMQ_VHOST:-/}'
+        ports:
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_RABBITMQ_PORT:-5672}:5672'
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_RABBITMQ_DASHBOARD_PORT:-15672}:15672'
+        volumes:
+            - rabbitmq-data:/var/lib/rabbitmq
+        healthcheck:
+            test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+            interval: 10s
+            timeout: 10s
+            retries: 20
+        restart: unless-stopped
+
+    mailpit:
+        image: axllent/mailpit:v1
+        ports:
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_BIND_ADDRESS:-127.0.0.1}:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        restart: unless-stopped
+
+volumes:
+    postgres-data:
+    redis-data:
+    rabbitmq-data:

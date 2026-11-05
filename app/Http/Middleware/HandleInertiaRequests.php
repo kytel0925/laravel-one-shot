@@ -42,6 +42,33 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'appearance' => in_array($request->cookie('appearance'), ['light', 'dark', 'system'], true)
+                ? $request->cookie('appearance')
+                : 'system',
+            'systemTheme' => $request->cookie('system_theme') === 'dark' ? 'dark' : 'light',
+            'viewport' => $this->viewport($request),
         ];
+    }
+
+    /**
+     * The browser window size reported by the `viewport` cookie, so server
+     * rendering picks the same Vuetify breakpoints as the browser. On the
+     * first visit it guesses from the client hints / user agent: a phone
+     * window for mobile browsers, a desktop window otherwise.
+     *
+     * @return array{width: int, height: int}
+     */
+    private function viewport(Request $request): array
+    {
+        $viewport = $request->cookie('viewport');
+
+        if (is_string($viewport) && preg_match('/^(\d{2,5})x(\d{2,5})$/', $viewport, $matches) === 1) {
+            return ['width' => (int) $matches[1], 'height' => (int) $matches[2]];
+        }
+
+        $mobile = $request->header('Sec-CH-UA-Mobile') === '?1'
+            || preg_match('/Mobi|Android|iPhone/i', (string) $request->userAgent()) === 1;
+
+        return $mobile ? ['width' => 390, 'height' => 844] : ['width' => 1280, 'height' => 800];
     }
 }

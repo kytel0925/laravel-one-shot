@@ -1,0 +1,10 @@
+asyncapi: 2.6.0
+info:
+    title: Fixture with an old version and component channels (must be rejected)
+    version: 1.0.0
+components:
+    channels:
+        jobProcessed:
+            address: Illuminate\Queue\Events\JobProcessed
+        misplaced:
+            address: Tests\Fixtures\AsyncApi\MisplacedEvent

@@ -1,42 +1,192 @@
+import '@mdi/font/css/materialdesignicons.css';
+import 'vuetify/styles';
+import '../css/app.css';
 import { createInertiaApp } from '@inertiajs/vue3';
-import { initializeTheme } from '@/composables/useAppearance';
+import { createVuetify } from 'vuetify';
+import { md3 } from 'vuetify/blueprints';
+import {
+    VAlert,
+    VApp,
+    VAppBar,
+    VAppBarNavIcon,
+    VAppBarTitle,
+    VAvatar,
+    VBottomNavigation,
+    VBreadcrumbs,
+    VBreadcrumbsDivider,
+    VBreadcrumbsItem,
+    VBtn,
+    VBtnToggle,
+    VCard,
+    VCardActions,
+    VCardItem,
+    VCardSubtitle,
+    VCardText,
+    VCardTitle,
+    VCheckbox,
+    VChip,
+    VCol,
+    VDialog,
+    VDivider,
+    VEmptyState,
+    VIcon,
+    VImg,
+    VList,
+    VListItem,
+    VListItemSubtitle,
+    VListItemTitle,
+    VMain,
+    VMenu,
+    VNavigationDrawer,
+    VOtpInput,
+    VProgressCircular,
+    VProgressLinear,
+    VRow,
+    VSheet,
+    VSkeletonLoader,
+    VSnackbarQueue,
+    VSpacer,
+    VTextField,
+    VTooltip,
+} from 'vuetify/components';
+import * as directives from 'vuetify/directives';
+import { en } from 'vuetify/locale';
+import AppRoot from '@/components/AppRoot.vue';
+import {
+    initialAppearance,
+    provideAppearance,
+    renderedTheme,
+} from '@/composables/useAppearance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
+import { darkTheme, lightTheme, primaryColor } from '@/lib/theme';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    // Every page renders inside AppRoot, which provides the one <v-app>.
     layout: (name) => {
         switch (true) {
             case name === 'Welcome':
-                return null;
+                return AppRoot;
             case name.startsWith('auth/'):
-                return AuthLayout;
+                return [AppRoot, AuthLayout];
             case name.startsWith('settings/'):
-                return [AppLayout, SettingsLayout];
+                return [AppRoot, AppLayout, SettingsLayout];
             default:
-                return AppLayout;
+                return [AppRoot, AppLayout];
         }
     },
-    withApp: (app) => {
+    withApp: (app, { page }) => {
+        const appearance = initialAppearance(page.props.appearance);
+        // Per app instance, so concurrent SSR requests never share it.
+        provideAppearance(app, appearance);
+
+        app.use(
+            createVuetify({
+                // Server and hydrating client start from the same window size
+                // (the `viewport` cookie); Vuetify measures the real one after mount.
+                ssr: {
+                    clientWidth: page.props.viewport.width,
+                    clientHeight: page.props.viewport.height,
+                },
+                blueprint: md3,
+                components: {
+                    VAlert,
+                    VApp,
+                    VAppBar,
+                    VAppBarNavIcon,
+                    VAppBarTitle,
+                    VAvatar,
+                    VBottomNavigation,
+                    VBreadcrumbs,
+                    VBreadcrumbsDivider,
+                    VBreadcrumbsItem,
+                    VBtn,
+                    VBtnToggle,
+                    VCard,
+                    VCardActions,
+                    VCardItem,
+                    VCardSubtitle,
+                    VCardText,
+                    VCardTitle,
+                    VCheckbox,
+                    VChip,
+                    VCol,
+                    VDialog,
+                    VDivider,
+                    VEmptyState,
+                    VIcon,
+                    VImg,
+                    VList,
+                    VListItem,
+                    VListItemSubtitle,
+                    VListItemTitle,
+                    VMain,
+                    VMenu,
+                    VNavigationDrawer,
+                    VOtpInput,
+                    VProgressCircular,
+                    VProgressLinear,
+                    VRow,
+                    VSheet,
+                    VSkeletonLoader,
+                    VSnackbarQueue,
+                    VSpacer,
+                    VTextField,
+                    VTooltip,
+                },
+                directives,
+                locale: { locale: 'en', messages: { en } },
+                // Material Design 3 window size classes.
+                display: {
+                    mobileBreakpoint: 'md',
+                    thresholds: {
+                        xs: 0,
+                        sm: 600,
+                        md: 960,
+                        lg: 1280,
+                        xl: 1920,
+                        xxl: 2560,
+                    },
+                },
+                theme: {
+                    defaultTheme: renderedTheme(
+                        appearance,
+                        page.props.systemTheme,
+                    ),
+                    themes: { light: lightTheme, dark: darkTheme },
+                },
+                defaults: {
+                    VTextField: { variant: 'outlined', density: 'comfortable' },
+                    VAlert: { variant: 'tonal', density: 'comfortable' },
+                },
+            }),
+        );
+
         app.directive('focus', {
             mounted: (el: HTMLElement, shouldFocus) => {
-                if (shouldFocus.value !== false) {
-                    el.focus();
+                if (shouldFocus.value === false) {
+                    return;
                 }
+
+                // Vuetify fields wrap the native input; focus that input.
+                const target =
+                    el instanceof HTMLInputElement
+                        ? el
+                        : el.querySelector<HTMLInputElement>('input, textarea');
+
+                target?.focus();
             },
         });
     },
     progress: {
-        color: '#4B5563',
+        color: primaryColor,
     },
 });
 
-// This will set light / dark mode on page load...
-initializeTheme();
-
-// This will listen for flash toast data from the server...
+// Shows Inertia::flash('toast', ...) messages from the server.
 initializeFlashToast();

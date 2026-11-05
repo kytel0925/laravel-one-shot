@@ -1,27 +1,59 @@
-# Laravel + Vue Starter Kit
+# Laravel One-Shot
 
-## Introduction
+A production-ready template built on the Laravel 13 Inertia + Vue starter kit
+(no teams). It runs Vue 3, TypeScript and Inertia 3 with Vuetify (Material
+Design), served by Octane on FrankenPHP (PHP 8.5). PostgreSQL, Redis,
+RabbitMQ and Mailpit run in Docker Compose.
 
-Our Vue starter kit provides a robust, modern starting point for building Laravel applications with a Vue frontend using [Inertia](https://inertiajs.com).
+## Quick start
 
-Inertia allows you to build modern, single-page Vue applications using classic server-side routing and controllers. This lets you enjoy the frontend power of Vue combined with the incredible backend productivity of Laravel and lightning-fast Vite compilation.
+```bash
+test -f .env || cp .env.example .env; docker compose up -d
+```
 
-This Vue starter kit utilizes Vue 3 and the Composition API, TypeScript, Tailwind, and the [shadcn-vue](https://www.shadcn-vue.com) component library.
+The first start installs Composer and npm dependencies, generates `APP_KEY`,
+runs the migrations, and then starts Octane, the Vite dev server and a queue
+worker. Watch the progress with `docker compose logs -f app`.
 
-## Official Documentation
+| Service           | URL / port                                 |
+| ----------------- | ------------------------------------------ |
+| Application       | http://localhost:8000                      |
+| Vite dev server   | http://localhost:5173                      |
+| Mailpit (web UI)  | http://localhost:8025                      |
+| RabbitMQ (web UI) | http://localhost:15672 (`guest` / `guest`) |
+| PostgreSQL        | `localhost:5432` (`laravel` / `secret`)    |
+| Redis             | `localhost:6379`                           |
 
-Documentation for all Laravel starter kits can be found on the [Laravel website](https://laravel.com/docs/starter-kits).
+Each published port can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, …).
 
-## Contributing
+## Everyday commands
 
-Thank you for considering contributing to our starter kit! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Run them inside the `app` container (`docker compose exec app …`):
 
-All contributions to the Starter Kits from now on should be made through [Maestro](https://github.com/laravel/maestro).
+| Task                                   | Command                                          |
+| -------------------------------------- | ------------------------------------------------ |
+| All PHP tests (Unit, Feature, Browser) | `php artisan test --compact`                     |
+| Browser (E2E) tests only               | `php artisan test --compact --testsuite=Browser` |
+| Frontend unit tests                    | `npm run test`                                   |
+| Everything CI runs                     | `composer ci:check`                              |
+| Production build of the assets         | `npm run build`                                  |
 
-## Code of Conduct
+Tests use the Compose services, never SQLite or array drivers: the `testing`
+PostgreSQL database (so tests never reset your development data), Redis,
+RabbitMQ and Mailpit. Browser tests drive Playwright's Chromium through Pest's
+browser plugin inside the same container. CI (`.github/workflows/tests.yml`)
+starts the same stack and runs `composer ci:check`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+On Linux, set `APP_UID` and `APP_GID` in `.env` to your `id -u` / `id -g` if
+they are not 1000, so files the container writes stay yours.
+
+## Project documentation
+
+- [AGENTS.md](AGENTS.md): instructions for coding agents, and the index of the
+  project rules in `resources/docs/agents/`.
+- [resources/docs/](resources/docs/): ADRs, OpenAPI and AsyncAPI specs,
+  `DEPLOYMENT.md` and `ER.md`.
 
 ## License
 
-The Laravel + Vue starter kit is open-sourced software licensed under the MIT license.
+MIT.

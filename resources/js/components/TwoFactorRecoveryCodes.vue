@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
-import { Eye, EyeOff, LockKeyhole, RefreshCw } from '@lucide/vue';
 import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
-import AlertError from '@/components/AlertError.vue';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { VExpandTransition } from 'vuetify/components';
 import { useTwoFactorAuth } from '@/composables/useTwoFactorAuth';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
 
@@ -27,7 +18,9 @@ const toggleRecoveryCodesVisibility = async () => {
 
     if (isRecoveryCodesVisible.value) {
         await nextTick();
-        recoveryCodeSectionRef.value?.scrollIntoView({ behavior: 'smooth' });
+        (
+            recoveryCodeSectionRef.value?.$el as HTMLElement | undefined
+        )?.scrollIntoView({ behavior: 'smooth' });
     }
 };
 
@@ -39,28 +32,31 @@ onMounted(async () => {
 </script>
 
 <template>
-    <Card class="w-full">
-        <CardHeader>
-            <CardTitle class="flex gap-3">
-                <LockKeyhole class="size-4" />2FA recovery codes
-            </CardTitle>
-            <CardDescription>
+    <v-card variant="outlined" rounded="xl">
+        <v-card-item prepend-icon="mdi-lock-outline">
+            <v-card-title class="text-title-medium">
+                2FA recovery codes
+            </v-card-title>
+            <v-card-subtitle class="text-body-medium text-wrap">
                 Recovery codes let you regain access if you lose your 2FA
                 device. Store them in a secure password manager.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div
-                class="flex flex-col gap-3 select-none sm:flex-row sm:items-center sm:justify-between"
-            >
-                <Button @click="toggleRecoveryCodesVisibility" class="w-fit">
-                    <component
-                        :is="isRecoveryCodesVisible ? EyeOff : Eye"
-                        class="size-4"
-                    />
+            </v-card-subtitle>
+        </v-card-item>
+        <v-card-text>
+            <div class="d-flex flex-wrap align-center ga-3">
+                <v-btn
+                    color="primary"
+                    variant="flat"
+                    :prepend-icon="
+                        isRecoveryCodesVisible
+                            ? 'mdi-eye-off-outline'
+                            : 'mdi-eye-outline'
+                    "
+                    @click="toggleRecoveryCodesVisibility"
+                >
                     {{ isRecoveryCodesVisible ? 'Hide' : 'View' }} recovery
                     codes
-                </Button>
+                </v-btn>
 
                 <Form
                     v-if="isRecoveryCodesVisible && recoveryCodesList.length"
@@ -70,54 +66,54 @@ onMounted(async () => {
                     @success="fetchRecoveryCodes"
                     #default="{ processing }"
                 >
-                    <Button
-                        variant="secondary"
+                    <v-btn
+                        variant="tonal"
                         type="submit"
-                        :disabled="processing"
+                        prepend-icon="mdi-refresh"
+                        :loading="processing"
                     >
-                        <RefreshCw /> Regenerate codes
-                    </Button>
+                        Regenerate codes
+                    </v-btn>
                 </Form>
             </div>
-            <div
-                :class="[
-                    'relative overflow-hidden transition-all duration-300',
-                    isRecoveryCodesVisible
-                        ? 'h-auto opacity-100'
-                        : 'h-0 opacity-0',
-                ]"
-            >
-                <div v-if="errors?.length" class="mt-6">
-                    <AlertError :errors="errors" />
-                </div>
-                <div v-else class="mt-3 space-y-3">
-                    <div
-                        ref="recoveryCodeSectionRef"
-                        class="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
-                    >
-                        <div v-if="!recoveryCodesList.length" class="space-y-2">
-                            <div
-                                v-for="n in 8"
-                                :key="n"
-                                class="h-4 animate-pulse rounded bg-muted-foreground/20"
-                            ></div>
+
+            <VExpandTransition>
+                <div v-show="isRecoveryCodesVisible">
+                    <v-alert v-if="errors?.length" type="error" class="mt-4">
+                        <div v-for="(error, index) in errors" :key="index">
+                            {{ error }}
                         </div>
-                        <div
-                            v-else
-                            v-for="(code, index) in recoveryCodesList"
-                            :key="index"
+                    </v-alert>
+                    <div v-else class="mt-4 d-flex flex-column ga-3">
+                        <v-sheet
+                            ref="recoveryCodeSectionRef"
+                            color="surface-container-high"
+                            rounded="lg"
+                            class="pa-4 text-mono text-body-medium"
                         >
-                            {{ code }}
-                        </div>
+                            <v-skeleton-loader
+                                v-if="!recoveryCodesList.length"
+                                type="list-item@4"
+                            />
+                            <div
+                                v-else
+                                v-for="(code, index) in recoveryCodesList"
+                                :key="index"
+                            >
+                                {{ code }}
+                            </div>
+                        </v-sheet>
+                        <p
+                            class="text-label-small text-medium-emphasis text-wrap"
+                        >
+                            Each recovery code can be used once to access your
+                            account and will be removed after use. If you need
+                            more, click
+                            <strong>Regenerate codes</strong> above.
+                        </p>
                     </div>
-                    <p class="text-xs text-muted-foreground select-none">
-                        Each recovery code can be used once to access your
-                        account and will be removed after use. If you need more,
-                        click
-                        <span class="font-bold">Regenerate codes</span> above.
-                    </p>
                 </div>
-            </div>
-        </CardContent>
-    </Card>
+            </VExpandTransition>
+        </v-card-text>
+    </v-card>
 </template>

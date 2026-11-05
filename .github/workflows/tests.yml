@@ -3,15 +3,20 @@ name: tests
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -19,20 +24,61 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+      # The same zero-config environment developers use: PHP 8.5 / FrankenPHP,
+      # Node 24 and Chromium in the app container, plus PostgreSQL, Redis,
+      # RabbitMQ and Mailpit. Tests never use SQLite or array drivers.
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          sed -i "s/^APP_UID=.*/APP_UID=$(id -u)/; s/^APP_GID=.*/APP_GID=$(id -g)/" .env
+
+      - name: Start the Docker Compose stack
+        run: docker compose up -d --build --wait --wait-timeout 1200
+
+      - name: Build front-end assets
+        run: docker compose exec -T app npm run build
+
+      - name: Run CI checks (lint, types, Pint, Larastan, Unit, Feature, Browser)
+        run: docker compose exec -T app composer ci:check
+
+      - name: Show container logs
+        if: failure()
+        run: docker compose logs --no-color --tail=300
+
+      - name: Upload browser screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          php-version: '8.3'
-          tools: composer:v2
-          coverage: none
+          name: browser-screenshots
+          path: tests/Browser/Screenshots
+          if-no-files-found: ignore
 
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+  production-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: '22'
+          persist-credentials: false
 
-      - name: Setup Application
-        run: composer setup
+      - name: Build the production image
+        run: docker build -f etc/docker/Dockerfile -t laravel-one-shot:ci .
 
-      - name: Run CI Checks
-        run: composer ci:check
+      # Octane on FrankenPHP must start as www-data and answer the health
+      # route; /up touches no database, cache or queue.
+      - name: Start the image and check /up
+        run: |
+          docker run -d --name app -p 8000:8000 \
+            -e APP_KEY="base64:$(openssl rand -base64 32)" \
+            laravel-one-shot:ci
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/up > /dev/null; then
+              echo "Production image is healthy."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs app
+          exit 1

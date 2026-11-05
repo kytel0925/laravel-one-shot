@@ -1,5 +1,6 @@
-import type { ComputedRef, Ref } from 'vue';
-import { computed, onMounted, ref } from 'vue';
+import type { App, ComputedRef, InjectionKey, Ref } from 'vue';
+import { computed, inject, ref } from 'vue';
+import { useTheme } from 'vuetify';
 import type { Appearance, ResolvedAppearance } from '@/types';
 
 export type { Appearance, ResolvedAppearance };
@@ -10,115 +11,63 @@ export type UseAppearanceReturn = {
     updateAppearance: (value: Appearance) => void;
 };
 
-export function updateTheme(value: Appearance): void {
-    if (typeof window === 'undefined') {
-        return;
-    }
+const appearances: readonly Appearance[] = ['light', 'dark', 'system'];
 
-    if (value === 'system') {
-        const mediaQueryList = window.matchMedia(
-            '(prefers-color-scheme: dark)',
-        );
-        const systemTheme = mediaQueryList.matches ? 'dark' : 'light';
-
-        document.documentElement.classList.toggle(
-            'dark',
-            systemTheme === 'dark',
-        );
-    } else {
-        document.documentElement.classList.toggle('dark', value === 'dark');
-    }
+export function isAppearance(value: unknown): value is Appearance {
+    return appearances.includes(value as Appearance);
 }
 
-const setCookie = (name: string, value: string, days = 365) => {
+/** The appearance stored in the `appearance` cookie (HandleAppearance). */
+export function initialAppearance(serverValue: unknown): Appearance {
+    return isAppearance(serverValue) ? serverValue : 'system';
+}
+
+/**
+ * The theme both the server and the hydrating client render first. The
+ * server cannot see the OS color scheme, so `system` uses the scheme the
+ * browser reported last time (the `system_theme` cookie); `AppRoot` then
+ * switches to the real appearance after mount.
+ */
+export function renderedTheme(
+    appearance: Appearance,
+    systemTheme: unknown,
+): ResolvedAppearance {
+    if (appearance !== 'system') {
+        return appearance;
+    }
+
+    return systemTheme === 'dark' ? 'dark' : 'light';
+}
+
+const AppearanceKey: InjectionKey<Ref<Appearance>> = Symbol('appearance');
+
+/** Called once per app in app.ts with the server's appearance. */
+export function provideAppearance(app: App, value: Appearance): void {
+    app.provide(AppearanceKey, ref(value));
+}
+
+function setCookie(name: string, value: string, days = 365): void {
     if (typeof document === 'undefined') {
         return;
     }
 
-    const maxAge = days * 24 * 60 * 60;
-
-    document.cookie = `${name}=${value};path=/;max-age=${maxAge};SameSite=Lax`;
-};
-
-const mediaQuery = () => {
-    if (typeof window === 'undefined') {
-        return null;
-    }
-
-    return window.matchMedia('(prefers-color-scheme: dark)');
-};
-
-const getStoredAppearance = () => {
-    if (typeof window === 'undefined') {
-        return null;
-    }
-
-    return localStorage.getItem('appearance') as Appearance | null;
-};
-
-const prefersDark = (): boolean => {
-    if (typeof window === 'undefined') {
-        return false;
-    }
-
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-};
-
-const handleSystemThemeChange = () => {
-    const currentAppearance = getStoredAppearance();
-
-    updateTheme(currentAppearance || 'system');
-};
-
-export function initializeTheme(): void {
-    if (typeof window === 'undefined') {
-        return;
-    }
-
-    // Initialize theme from saved preference or default to system...
-    const savedAppearance = getStoredAppearance();
-    updateTheme(savedAppearance || 'system');
-
-    // Set up system theme change listener...
-    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    document.cookie = `${name}=${value};path=/;max-age=${days * 24 * 60 * 60};SameSite=Lax`;
 }
 
-const appearance = ref<Appearance>('system');
-
 export function useAppearance(): UseAppearanceReturn {
-    onMounted(() => {
-        const savedAppearance = localStorage.getItem(
-            'appearance',
-        ) as Appearance | null;
+    const theme = useTheme();
+    const appearance = inject(AppearanceKey, ref<Appearance>('system'));
 
-        if (savedAppearance) {
-            appearance.value = savedAppearance;
-        }
-    });
+    const resolvedAppearance = computed<ResolvedAppearance>(() =>
+        theme.current.value.dark ? 'dark' : 'light',
+    );
 
-    const resolvedAppearance = computed<ResolvedAppearance>(() => {
-        if (appearance.value === 'system') {
-            return prefersDark() ? 'dark' : 'light';
-        }
-
-        return appearance.value;
-    });
-
-    function updateAppearance(value: Appearance) {
+    function updateAppearance(value: Appearance): void {
         appearance.value = value;
-
-        // Store in localStorage for client-side persistence...
-        localStorage.setItem('appearance', value);
-
-        // Store in cookie for SSR...
+        // The cookie is the single source of truth: the server renders with it.
         setCookie('appearance', value);
-
-        updateTheme(value);
+        void theme.change(value);
     }
 
-    return {
-        appearance,
-        resolvedAppearance,
-        updateAppearance,
-    };
+    return { appearance, resolvedAppearance, updateAppearance };
 }

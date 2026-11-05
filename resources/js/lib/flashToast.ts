@@ -1,16 +1,39 @@
 import { router } from '@inertiajs/vue3';
-import { toast } from 'vue-sonner';
+import { ref } from 'vue';
 import type { FlashToast } from '@/types/ui';
 
+export type SnackbarMessage = {
+    text: string;
+    prependIcon: string;
+    timeout: number;
+};
+
+const icons: Record<FlashToast['type'], string> = {
+    success: 'mdi-check-circle-outline',
+    info: 'mdi-information-outline',
+    warning: 'mdi-alert-outline',
+    error: 'mdi-alert-circle-outline',
+};
+
+/** Messages shown by the `<v-snackbar-queue>` in `AppRoot.vue`. */
+export const snackbarQueue = ref<SnackbarMessage[]>([]);
+
+export function showToast(toast: FlashToast): void {
+    snackbarQueue.value.push({
+        text: toast.message,
+        prependIcon: icons[toast.type],
+        timeout: toast.type === 'error' ? 8000 : 4000,
+    });
+}
+
+/** Shows `Inertia::flash('toast', [...])` messages sent by controllers. */
 export function initializeFlashToast(): void {
     router.on('flash', (event) => {
         const flash = (event as CustomEvent).detail?.flash;
         const data = flash?.toast as FlashToast | undefined;
 
-        if (!data) {
-            return;
+        if (data) {
+            showToast(data);
         }
-
-        toast[data.type](data.message);
     });
 }

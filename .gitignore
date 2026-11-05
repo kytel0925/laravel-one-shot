@@ -27,19 +27,22 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-/.agents
 /.amp
-/.claude
-/.codex
 /.cursor
 /.factory
 /.grok
 /.junie
 /.kiro
 /.pi
-/.mcp.json
-/AGENTS.md
-/CLAUDE.md
-/boost.json
 /opencode.json
 /opencode.jsonc
+
+/caddy
+/frankenphp
+/public/frankenphp-worker.php
+/tests/Browser/Screenshots
+
+# Agent instructions (AGENTS.md, CLAUDE.md, .claude/commands, .codex, .mcp.json,
+# boost.json) and the Boost skills (.claude/skills, .agents/skills, regenerated
+# by `composer update`) are committed; only local agent state is ignored.
+/.claude/settings.local.json
